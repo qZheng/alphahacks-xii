@@ -35,7 +35,11 @@ let package = Package(
             capabilities: [
                 .locationAlwaysAndWhenInUse(purposeString: "We use your location during class start times to verify attendance."),
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
                 .calendars(purposeString: "We use canel")
+=======
+                .calendars(purposeString: "meow")
+>>>>>>> Stashed changes
 =======
                 .calendars(purposeString: "meow")
 >>>>>>> Stashed changes
