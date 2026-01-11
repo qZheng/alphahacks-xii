@@ -74,6 +74,8 @@ final class AttendanceEngine: ObservableObject, @unchecked Sendable {
         }
 
         // 2) Get user location (one-shot)
+        lastCheckMessage = "Checking your location…"
+
         do {
             let loc = try await locationManager.getCurrentLocation(timeoutSeconds: 10)
 

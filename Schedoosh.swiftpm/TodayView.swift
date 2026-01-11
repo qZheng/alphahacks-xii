@@ -25,7 +25,6 @@ struct TodayView: View {
             .navigationBarTitleDisplayMode(.inline)
         }
         .task {
-            // This triggers the permission prompt on first launch (status == .notDetermined)
             _ = await location.requestAuthorizationIfNeeded()
         }
     }

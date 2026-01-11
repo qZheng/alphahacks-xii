@@ -2,173 +2,166 @@ import Foundation
 import CoreLocation
 
 @MainActor
-final class LocationManager: NSObject, ObservableObject {
+final class LocationManager: NSObject, ObservableObject, @unchecked Sendable {
 
-    // MARK: - Errors
-
-    enum LocationError: Error, LocalizedError {
-        case locationServicesDisabled
+    enum LocationError: LocalizedError {
+        case servicesDisabled
         case notAuthorized(CLAuthorizationStatus)
-        case requestInProgress
         case timeout
-        case noLocationReturned
+        case alreadyRequestingLocation
 
         var errorDescription: String? {
             switch self {
-            case .locationServicesDisabled:
-                return "Location Services are disabled on this device."
-            case .notAuthorized(let status):
-                return "Location permission not granted (status: \(status.rawValue))."
-            case .requestInProgress:
-                return "A location request is already in progress."
+            case .servicesDisabled:
+                return "Location Services are disabled."
+            case .notAuthorized(let s):
+                return "Location permission not granted (\(s))."
             case .timeout:
-                return "Location request timed out."
-            case .noLocationReturned:
-                return "No location was returned."
+                return "Timed out while trying to get your location."
+            case .alreadyRequestingLocation:
+                return "Already requesting location. Try again in a moment."
             }
         }
     }
 
-    // MARK: - Published state for SwiftUI
-
+    // MARK: - Published state
     @Published private(set) var authorizationStatus: CLAuthorizationStatus
     @Published private(set) var lastLocation: CLLocation?
     @Published private(set) var lastErrorMessage: String?
 
-    /// Demo/simulator support
-    @Published var isUsingMockLocation: Bool = false
-    @Published var mockCoordinate: CLLocationCoordinate2D? = nil
-
     // MARK: - Private
-
     private let manager: CLLocationManager
 
-    private var authContinuations: [CheckedContinuation<CLAuthorizationStatus, Never>] = []
-    private var didRequestAuthPrompt = false
+    // One-shot location continuation
     private var locationContinuation: CheckedContinuation<CLLocation, Error>?
-    private var timeoutTask: Task<Void, Never>?
+    private var locationTimeoutTask: Task<Void, Never>?
 
-    /// How "fresh" a cached location must be to reuse it (seconds)
-    private let cacheMaxAge: TimeInterval = 30
-
-    // MARK: - Init
+    // Authorization waiters (support multiple callers)
+    private var authContinuations: [CheckedContinuation<CLAuthorizationStatus, Never>] = []
+    private var authTimeoutTask: Task<Void, Never>?
 
     override init() {
-        self.manager = CLLocationManager()
-        self.authorizationStatus = manager.authorizationStatus
+        let m = CLLocationManager()
+        self.manager = m
+        self.authorizationStatus = m.authorizationStatus
         super.init()
 
-        manager.delegate = self
-        manager.desiredAccuracy = kCLLocationAccuracyBest
-        manager.distanceFilter = kCLDistanceFilterNone
+        m.delegate = self
+        m.desiredAccuracy = kCLLocationAccuracyHundredMeters
+        m.distanceFilter = 10
+        m.pausesLocationUpdatesAutomatically = true
     }
 
     // MARK: - Authorization
 
-    /// Prompts for permission only if needed. Returns the resulting status.
-    func requestAuthorizationIfNeeded() async -> CLAuthorizationStatus {
+    /// Triggers the system prompt if status is `.notDetermined`.
+    /// Safe to call multiple times; if the OS already prompted, it’s a no-op.
+    func requestAuthorizationIfNeeded(timeoutSeconds: TimeInterval = 15) async -> CLAuthorizationStatus {
+        // Always read from CoreLocation directly (don’t rely on cached Published state)
         let status = manager.authorizationStatus
         authorizationStatus = status
 
-        // If already determined, return immediately (no prompt)
-        if status != .notDetermined {
+        switch status {
+        case .authorizedAlways, .authorizedWhenInUse, .denied, .restricted:
             return status
-        }
 
-        // Otherwise, wait for the authorization callback.
-        return await withCheckedContinuation { cont in
-            authContinuations.append(cont)
+        case .notDetermined:
+            return await withCheckedContinuation { cont in
+                authContinuations.append(cont)
 
-            // Only trigger the system prompt once.
-            if !didRequestAuthPrompt {
-                didRequestAuthPrompt = true
+                // IMPORTANT: do NOT “only prompt once”.
+                // If the first attempt happened too early / failed, you still want later calls to prompt.
                 manager.requestWhenInUseAuthorization()
+
+                // Timeout so we never hang forever
+                if authTimeoutTask == nil {
+                    authTimeoutTask = Task { [weak self] in
+                        try? await Task.sleep(nanoseconds: UInt64(timeoutSeconds * 1_000_000_000))
+                        guard let self else { return }
+                        await self.timeoutAuthorizationWaitIfNeeded()
+                    }
+                }
             }
+
+        @unknown default:
+            return status
         }
     }
 
+    // MARK: - One-shot location
 
-    // MARK: - One-shot location (best for your check-in flow)
-
-    /// Gets a one-shot current location. Uses cached value if it's recent enough.
     func getCurrentLocation(timeoutSeconds: TimeInterval = 10) async throws -> CLLocation {
-        // Demo mode
-        if isUsingMockLocation, let c = mockCoordinate {
-            let loc = CLLocation(latitude: c.latitude, longitude: c.longitude)
-            self.lastLocation = loc
-            self.lastErrorMessage = nil
-            return loc
-        }
+        lastErrorMessage = nil
 
         guard CLLocationManager.locationServicesEnabled() else {
-            throw LocationError.locationServicesDisabled
+            lastErrorMessage = LocationError.servicesDisabled.localizedDescription
+            throw LocationError.servicesDisabled
         }
 
-        // Ensure authorized
         let status = await requestAuthorizationIfNeeded()
-        authorizationStatus = status
 
-        guard status == .authorizedWhenInUse || status == .authorizedAlways else {
+        guard status == .authorizedAlways || status == .authorizedWhenInUse else {
+            lastErrorMessage = LocationError.notAuthorized(status).localizedDescription
             throw LocationError.notAuthorized(status)
         }
 
-        // Use cached location if fresh
-        if let last = lastLocation, abs(last.timestamp.timeIntervalSinceNow) <= cacheMaxAge {
-            return last
-        }
-
-        // Prevent overlapping requests
         if locationContinuation != nil {
-            throw LocationError.requestInProgress
+            lastErrorMessage = LocationError.alreadyRequestingLocation.localizedDescription
+            throw LocationError.alreadyRequestingLocation
         }
 
         return try await withCheckedThrowingContinuation { cont in
             self.locationContinuation = cont
-            self.lastErrorMessage = nil
 
-            // Fire request
-            self.manager.requestLocation()
-
-            // Timeout
-            self.timeoutTask?.cancel()
-            self.timeoutTask = Task { [weak self] in
-                guard let self else { return }
+            self.locationTimeoutTask?.cancel()
+            self.locationTimeoutTask = Task { [weak self] in
                 try? await Task.sleep(nanoseconds: UInt64(timeoutSeconds * 1_000_000_000))
+                guard let self else { return }
                 await self.failLocationRequest(LocationError.timeout)
             }
+
+            manager.requestLocation()
         }
     }
 
-    // MARK: - Helpers (useful for attendance checks)
+    // MARK: - Internal helpers
 
-    func distanceMeters(from location: CLLocation? = nil, to target: CLLocationCoordinate2D) -> Double? {
-        let base = location ?? lastLocation
-        guard let base else { return nil }
-        let t = CLLocation(latitude: target.latitude, longitude: target.longitude)
-        return base.distance(from: t)
-    }
+    private func resolveAuthWaiters(with status: CLAuthorizationStatus) {
+        // Only resolve once the user has decided (or system updated status)
+        guard status != .notDetermined else { return }
 
-    func isWithin(radiusMeters: Double, of target: CLLocationCoordinate2D, using location: CLLocation? = nil) -> Bool {
-        guard let d = distanceMeters(from: location, to: target) else { return false }
-        return d <= radiusMeters
-    }
+        authTimeoutTask?.cancel()
+        authTimeoutTask = nil
 
-    func coarseCoordinate(from location: CLLocation, decimals: Int = 3) -> CLLocationCoordinate2D {
-        func roundTo(_ value: Double) -> Double {
-            let p = pow(10.0, Double(decimals))
-            return (value * p).rounded() / p
+        let waiters = authContinuations
+        authContinuations.removeAll()
+        for w in waiters {
+            w.resume(returning: status)
         }
-        return CLLocationCoordinate2D(
-            latitude: roundTo(location.coordinate.latitude),
-            longitude: roundTo(location.coordinate.longitude)
-        )
     }
 
-    // MARK: - Internal completion
+    private func timeoutAuthorizationWaitIfNeeded() {
+        // If we’re still notDetermined, resume waiters anyway so callers can fail gracefully
+        let status = manager.authorizationStatus
+        authorizationStatus = status
+
+        guard status == .notDetermined else { return }
+
+        authTimeoutTask?.cancel()
+        authTimeoutTask = nil
+
+        let waiters = authContinuations
+        authContinuations.removeAll()
+        for w in waiters {
+            w.resume(returning: status)
+        }
+
+        lastErrorMessage = "Location prompt timed out. Try again and respond to the prompt."
+    }
 
     private func finishLocationRequest(_ location: CLLocation) {
-        timeoutTask?.cancel()
-        timeoutTask = nil
+        locationTimeoutTask?.cancel()
+        locationTimeoutTask = nil
 
         lastLocation = location
         lastErrorMessage = nil
@@ -179,8 +172,8 @@ final class LocationManager: NSObject, ObservableObject {
     }
 
     private func failLocationRequest(_ error: Error) {
-        timeoutTask?.cancel()
-        timeoutTask = nil
+        locationTimeoutTask?.cancel()
+        locationTimeoutTask = nil
 
         lastErrorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
 
@@ -191,42 +184,36 @@ final class LocationManager: NSObject, ObservableObject {
 }
 
 // MARK: - CLLocationManagerDelegate
-extension LocationManager: CLLocationManagerDelegate {
+extension LocationManager: @preconcurrency CLLocationManagerDelegate {
 
     nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
-        let newStatus = manager.authorizationStatus
+        let status = manager.authorizationStatus
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            self.authorizationStatus = status
+            self.resolveAuthWaiters(with: status)
+        }
+    }
 
-        Task { @MainActor in
-            self.authorizationStatus = newStatus
-
-            // If someone is awaiting the auth prompt, resume them
-            // Only resume waiters once status is determined
-            guard newStatus != .notDetermined else { return }
-
-            let waiters = self.authContinuations
-            self.authContinuations.removeAll()
-            for cont in waiters {
-                cont.resume(returning: newStatus)
-            }
-
+    nonisolated func locationManager(_ manager: CLLocationManager, didChangeAuthorization status: CLAuthorizationStatus) {
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            self.authorizationStatus = status
+            self.resolveAuthWaiters(with: status)
         }
     }
 
     nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        // pick newest
-        let best = locations.sorted(by: { $0.timestamp > $1.timestamp }).first
-
-        Task { @MainActor in
-            if let best {
-                self.finishLocationRequest(best)
-            } else {
-                self.failLocationRequest(LocationError.noLocationReturned)
-            }
+        guard let loc = locations.last else { return }
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            self.finishLocationRequest(loc)
         }
     }
 
     nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        Task { @MainActor in
+        Task { @MainActor [weak self] in
+            guard let self else { return }
             self.failLocationRequest(error)
         }
     }
