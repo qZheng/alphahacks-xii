@@ -40,6 +40,12 @@ class User(db.Model):
         back_populates="members"
     )
 
+    events = db.relationship(
+        "TimedEvent",
+        back_populates="user",
+        cascade="all, delete-orphan"
+    )
+    
     def set_password(self, password: str):
         self.password_hash = generate_password_hash(password)
 
