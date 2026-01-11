@@ -5,6 +5,7 @@ struct SchedooshApp: App {
     @StateObject private var store = DataStore()
     @StateObject private var engine: AttendanceEngine
     @StateObject private var auth = AuthStore()
+    @StateObject private var location = LocationManager()
 
     init() {
         let store = DataStore()
@@ -18,6 +19,7 @@ struct SchedooshApp: App {
                 .environmentObject(store)
                 .environmentObject(engine)
                 .environmentObject(auth)
+                .environmentObject(location)  
         }
     }
 }
