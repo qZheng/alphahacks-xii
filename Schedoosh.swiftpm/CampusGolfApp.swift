@@ -22,9 +22,12 @@ struct SchedooshApp: App {
                 .environmentObject(auth)
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
                 .environmentObject(buildings)
                 .environmentObject(location)
 =======
+=======
+>>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
                 .environmentObject(location)
@@ -46,6 +49,9 @@ struct SchedooshApp: App {
                     }
                 }
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
