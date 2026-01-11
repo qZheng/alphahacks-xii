@@ -43,7 +43,8 @@ final class LocationManager: NSObject, ObservableObject {
 
     private let manager: CLLocationManager
 
-    private var authContinuation: CheckedContinuation<CLAuthorizationStatus, Never>?
+    private var authContinuations: [CheckedContinuation<CLAuthorizationStatus, Never>] = []
+    private var didRequestAuthPrompt = false
     private var locationContinuation: CheckedContinuation<CLLocation, Error>?
     private var timeoutTask: Task<Void, Never>?
 
@@ -66,17 +67,26 @@ final class LocationManager: NSObject, ObservableObject {
 
     /// Prompts for permission only if needed. Returns the resulting status.
     func requestAuthorizationIfNeeded() async -> CLAuthorizationStatus {
-        authorizationStatus = manager.authorizationStatus
+        let status = manager.authorizationStatus
+        authorizationStatus = status
 
-        if authorizationStatus == .notDetermined {
-            return await withCheckedContinuation { cont in
-                self.authContinuation = cont
-                self.manager.requestWhenInUseAuthorization()
-            }
+        // If already determined, return immediately (no prompt)
+        if status != .notDetermined {
+            return status
         }
 
-        return authorizationStatus
+        // Otherwise, wait for the authorization callback.
+        return await withCheckedContinuation { cont in
+            authContinuations.append(cont)
+
+            // Only trigger the system prompt once.
+            if !didRequestAuthPrompt {
+                didRequestAuthPrompt = true
+                manager.requestWhenInUseAuthorization()
+            }
+        }
     }
+
 
     // MARK: - One-shot location (best for your check-in flow)
 
@@ -190,10 +200,15 @@ extension LocationManager: CLLocationManagerDelegate {
             self.authorizationStatus = newStatus
 
             // If someone is awaiting the auth prompt, resume them
-            if let cont = self.authContinuation {
-                self.authContinuation = nil
+            // Only resume waiters once status is determined
+            guard newStatus != .notDetermined else { return }
+
+            let waiters = self.authContinuations
+            self.authContinuations.removeAll()
+            for cont in waiters {
                 cont.resume(returning: newStatus)
             }
+
         }
     }
 

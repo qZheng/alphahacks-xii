@@ -4,6 +4,8 @@ struct SettingsView: View {
     @EnvironmentObject var store: DataStore
     @EnvironmentObject var auth: AuthStore
     @State private var name: String = ""
+    @EnvironmentObject var buildings: BuildingStore
+
 
     var body: some View {
         NavigationStack {
@@ -79,6 +81,11 @@ struct SettingsView: View {
 
     private var profileCard: some View {
         VStack(alignment: .leading, spacing: 12) {
+            Text("Buildings loaded: \(buildings.buildingsByCode.count)")
+            if let err = buildings.loadError {
+                Text("Buildings error: \(err)").foregroundStyle(.red)
+            }
+
             Text("Profile")
                 .font(.headline)
                 .foregroundStyle(AppColors.textSecondary)

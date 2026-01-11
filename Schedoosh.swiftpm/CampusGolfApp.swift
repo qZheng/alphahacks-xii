@@ -2,11 +2,12 @@ import SwiftUI
 
 @main
 struct SchedooshApp: App {
-    @StateObject private var store = DataStore()
+    @StateObject private var store: DataStore
     @StateObject private var engine: AttendanceEngine
+
     @StateObject private var auth = AuthStore()
     @StateObject private var location = LocationManager()
-    @StateObject private var buildings = BuildingStore() 
+    @StateObject private var buildings = BuildingStore()
 
     init() {
         let store = DataStore()
@@ -20,41 +21,8 @@ struct SchedooshApp: App {
                 .environmentObject(store)
                 .environmentObject(engine)
                 .environmentObject(auth)
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
+                .environmentObject(location)
                 .environmentObject(buildings)
-                .environmentObject(location)
-=======
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-                .environmentObject(location)
-                .onAppear {
-                    store.authStore = auth
-                    Task {
-                        if auth.isLoggedIn {
-                            await store.refresh()
-                        }
-                    }
-                }
-                .onChange(of: auth.isLoggedIn) { newValue in
-                    if newValue {
-                        Task {
-                            await store.refresh()
-                        }
-                    } else {
-                        store.clearAll()
-                    }
-                }
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
         }
     }
 }
