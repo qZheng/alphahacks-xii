@@ -1,8 +1,6 @@
 import SwiftUI
 import UIKit
 
-/// A secure text field that disables iCloud Keychain / Strong Password overlays.
-/// Useful in Simulator / Swift Playgrounds where iCloud Keychain may be disabled.
 struct NoAutofillSecureField: UIViewRepresentable {
     let placeholder: String
     @Binding var text: String
@@ -24,9 +22,17 @@ struct NoAutofillSecureField: UIViewRepresentable {
         tf.smartDashesType = .no
         tf.smartInsertDeleteType = .no
 
-        // This is the key: don't trigger password autofill / strong password UI.
+        // don't trigger password autofill / strong password UI.
         tf.textContentType = nil
         tf.keyboardType = .asciiCapable
+        tf.keyboardAppearance = .dark
+
+        tf.textColor = .white
+        tf.tintColor = UIColor.white
+        tf.attributedPlaceholder = NSAttributedString(
+            string: placeholder,
+            attributes: [.foregroundColor: UIColor.white.withAlphaComponent(0.55)]
+        )
 
         tf.delegate = context.coordinator
         tf.addTarget(context.coordinator, action: #selector(Coordinator.changed(_:)), for: .editingChanged)

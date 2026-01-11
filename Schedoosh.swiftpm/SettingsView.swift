@@ -7,52 +7,124 @@ struct SettingsView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section("Account") {
-                    HStack {
-                        Text("Status")
-                        Spacer()
-                        Text(auth.isLoggedIn ? "Logged in" : "Logged out")
-                            .foregroundStyle(auth.isLoggedIn ? .green : .secondary)
-                    }
+            ScrollView {
+                VStack(spacing: 16) {
+                    header
 
-                    if auth.isLoggedIn {
-                        HStack {
-                            Text("Username")
-                            Spacer()
-                            Text(auth.username.isEmpty ? "Player" : auth.username)
-                                .foregroundStyle(.secondary)
-                        }
+                    accountCard
 
-                        Button("Log out", role: .destructive) {
-                            auth.logout()
-                        }
-                    }
+                    profileCard
+
+                    rulesCard
+
+                    dangerCard
                 }
-
-                Section("Profile") {
-                    TextField("Display name", text: $name)
-                    Button("Save Name") {
-                        store.profile.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
-                        store.reconcileMeInGroups()
-                    }
-                    .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                }
-
-                Section("Rules") {
-                    Text("You get +1 point if you don't check in within 10 minutes of class start. It's a friends game—honor system.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                Section("Danger zone") {
-                    Button("Reset Everything", role: .destructive) {
-                        store.clearAll()
-                    }
-                }
+                .padding(20)
             }
-            .navigationTitle("Settings")
+            .navigationTitle("")
+            .appScreen()
+            .scrollContentBackground(.hidden)
+            .navigationBarTitleDisplayMode(.inline)
             .onAppear { name = store.profile.name }
         }
+        
+    }
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Settings")
+                .font(.system(size: 34, weight: .bold, design: .rounded))
+                .foregroundStyle(.white)
+            Text("Make it yours.")
+                .font(.system(size: 15, weight: .medium, design: .rounded))
+                .foregroundStyle(AppColors.textSecondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var accountCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Account")
+                .font(.headline)
+                .foregroundStyle(AppColors.textSecondary)
+
+            HStack {
+                Text("Status")
+                    .foregroundStyle(.white)
+                Spacer()
+                Text(auth.isLoggedIn ? "Logged in" : "Logged out")
+                    .foregroundStyle(auth.isLoggedIn ? AppColors.castletonGreen : AppColors.textSecondary)
+            }
+
+            if auth.isLoggedIn {
+                HStack {
+                    Text("Username")
+                        .foregroundStyle(.white)
+                    Spacer()
+                    Text(auth.username.isEmpty ? "Player" : auth.username)
+                        .foregroundStyle(AppColors.textSecondary)
+                }
+
+                Button(role: .destructive) {
+                    auth.logout()
+                } label: {
+                    Text("Log out")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(SecondaryButtonStyle())
+            }
+        }
+        .appCard()
+    }
+
+    private var profileCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Profile")
+                .font(.headline)
+                .foregroundStyle(AppColors.textSecondary)
+
+            TextField("Display name", text: $name)
+                .appTextField()
+
+            Button {
+                store.profile.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+                store.reconcileMeInGroups()
+            } label: {
+                Text("Save name")
+            }
+            .buttonStyle(PrimaryButtonStyle())
+            .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        }
+        .appCard()
+    }
+
+    private var rulesCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Rules")
+                .font(.headline)
+                .foregroundStyle(AppColors.textSecondary)
+
+            Text("You get +1 point if you don’t check in within 10 minutes of class start. It’s a friends game—honor system.")
+                .font(.caption)
+                .foregroundStyle(AppColors.textSecondary)
+        }
+        .appCard()
+    }
+
+    private var dangerCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Danger zone")
+                .font(.headline)
+                .foregroundStyle(AppColors.textSecondary)
+
+            Button(role: .destructive) {
+                store.clearAll()
+            } label: {
+                Text("Reset everything")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(SecondaryButtonStyle())
+        }
+        .appCard()
     }
 }
