@@ -18,7 +18,6 @@ struct LoginView: View {
                             .appTextField()
 
                         NoAutofillSecureField("Password", text: $password)
-                            .frame(height: 48)
                             .appTextField()
                     }
                     .appCard()
