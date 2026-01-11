@@ -17,47 +17,100 @@ struct EditClassView: View {
     @State private var minute: Int = 0
     @State private var enabled: Bool = true
 
+    @State private var time: Date = Date()
+
     var body: some View {
-        Form {
-            Section("Basics") {
-                TextField("Class name", text: $title)
-                Toggle("Enabled", isOn: $enabled)
-            }
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(spacing: 16) {
+                header
 
-            Section("When") {
-                Picker("Day", selection: $weekday) {
-                    ForEach(1...7, id: \.self) { w in
-                        Text(Calendar.current.weekdaySymbols[w - 1]).tag(w)
+                VStack(spacing: 12) {
+                    TextField("Class name", text: $title)
+                        .appTextField()
+
+                    Toggle(isOn: $enabled) {
+                        Text("Enabled")
+                            .foregroundStyle(.white)
                     }
+                    .tint(AppColors.accentPop)
                 }
-                Stepper("Hour: \(hour)", value: $hour, in: 0...23)
-                Stepper("Minute: \(minute)", value: $minute, in: 0...59)
+                .appCard()
 
-                Text("Check-in window is 10 minutes before to 10 minutes after start time.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("When")
+                        .font(.headline)
+                        .foregroundStyle(AppColors.textSecondary)
 
-            Section {
-                Button(saveTitle) {
-                    save()
+                    HStack {
+                        Text("Day")
+                            .foregroundStyle(.white)
+                        Spacer()
+                        Picker("", selection: $weekday) {
+                            ForEach(1...7, id: \.self) { w in
+                                Text(Calendar.current.weekdaySymbols[w - 1]).tag(w)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .tint(AppColors.accentPop)
+                    }
+
+                    Divider().overlay(Color.white.opacity(0.12))
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Time")
+                            .foregroundStyle(.white)
+
+                        DatePicker(
+                            "",
+                            selection: $time,
+                            displayedComponents: [.hourAndMinute]
+                        )
+                        .datePickerStyle(.wheel)
+                        .labelsHidden()
+                        .tint(AppColors.accentPop)
+                    }
+
+                    Text("Check-in window is 10 minutes before to 10 minutes after start time.")
+                        .font(.caption)
+                        .foregroundStyle(AppColors.textSecondary)
                 }
-                .disabled(!canSave)
+                .appCard()
+
+                Button(saveTitle) { save() }
+                    .buttonStyle(PrimaryButtonStyle())
+                    .disabled(!canSave)
 
                 if case .edit = mode {
-                    Button("Delete", role: .destructive) {
-                        delete()
+                    Button(role: .destructive) { delete() } label: {
+                        Text("Delete class")
                     }
+                    .buttonStyle(SecondaryButtonStyle())
                 }
             }
+            .padding(20)
         }
         .navigationTitle(navTitle)
-        .onAppear { load() }
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button("Close") { dismiss() }
+                    .foregroundStyle(.white)
             }
         }
+        .onAppear { load() }
+        .appScreen()
+    }
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(navTitle)
+                .font(.system(size: 30, weight: .bold, design: .rounded))
+                .foregroundStyle(.white)
+            Text("Keep it simple and consistent.")
+                .font(.caption)
+                .foregroundStyle(AppColors.textSecondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var saveTitle: String {
@@ -79,13 +132,17 @@ struct EditClassView: View {
     }
 
     private func load() {
+        let cal = Calendar.current
+
         switch mode {
         case .add:
             title = ""
             enabled = true
             let now = Date()
-            hour = Calendar.current.component(.hour, from: now)
-            minute = Calendar.current.component(.minute, from: now)
+            weekday = cal.component(.weekday, from: now)
+            hour = cal.component(.hour, from: now)
+            minute = cal.component(.minute, from: now)
+
         case .edit(let c):
             title = c.title
             weekday = c.weekday
@@ -93,10 +150,18 @@ struct EditClassView: View {
             minute = c.minute
             enabled = c.enabled
         }
+
+        // ✅ sync wheel picker with stored hour/minute
+        time = cal.date(bySettingHour: hour, minute: minute, second: 0, of: Date()) ?? Date()
     }
 
     private func save() {
         let cleanTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cal = Calendar.current
+
+        // ✅ sync stored hour/minute from wheel picker
+        hour = cal.component(.hour, from: time)
+        minute = cal.component(.minute, from: time)
 
         switch mode {
         case .add:

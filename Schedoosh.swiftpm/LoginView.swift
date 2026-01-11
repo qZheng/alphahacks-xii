@@ -9,63 +9,87 @@ struct LoginView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section("Sign in") {
-                    TextField("Username", text: $username)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
+            ScrollView {
+                VStack(spacing: 20) {
+                    header
 
-                    NoAutofillSecureField("Password", text: $password)
-                        .frame(height: 22)
-                }
+                    VStack(spacing: 12) {
+                        TextField("Username", text: $username)
+                            .appTextField()
 
-                Section {
+                        NoAutofillSecureField("Password", text: $password)
+                            .frame(height: 48)
+                            .appTextField()
+                    }
+                    .appCard()
+
                     Button {
-                        let u = username
+                        let u = username.trimmingCharacters(in: .whitespacesAndNewlines)
                         let p = password
                         Task { @MainActor in
                             _ = await auth.login(username: u, password: p)
                         }
                     } label: {
-                        HStack {
-                            Spacer()
-                            if auth.isLoading {
-                                ProgressView()
-                            } else {
-                                Text("Log In")
-                            }
-                            Spacer()
+                        if auth.isLoading {
+                            ProgressView().tint(.white)
+                        } else {
+                            Text("Log In")
                         }
                     }
-                    .disabled(auth.isLoading)
+                    .buttonStyle(PrimaryButtonStyle())
+                    .disabled(auth.isLoading || username.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
 
-                    Text("Demo mode: any username/password works. Replace the TODO in AuthStore.login(...) with a real API call later.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+                    if let err = auth.lastError, !err.isEmpty {
+                        Text(err)
+                            .font(.footnote)
+                            .foregroundStyle(AppColors.danger)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
+                    }
 
-                Section {
-                    Button("Don’t have an account? Sign up") {
+                    VStack(spacing: 6) {
+                        Text("Demo mode: any username/password works.")
+                        Text("Replace the TODO in AuthStore.login(...) with a real API call later.")
+                    }
+                    .font(.caption)
+                    .foregroundStyle(AppColors.textSecondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+
+                    Button {
                         showingSignUp = true
+                    } label: {
+                        Text("Don’t have an account? Sign Up")
                     }
+                    .buttonStyle(SecondaryButtonStyle())
                     .disabled(auth.isLoading)
                 }
-
-                if let err = auth.lastError, !err.isEmpty {
-                    Section("Error") {
-                        Text(err).foregroundStyle(.red)
-                    }
-                }
+                .padding(20)
             }
-            .navigationTitle("Schedoosh")
+            .scrollDismissesKeyboard(.interactively)
+            .navigationBarHidden(true)
+            .appScreen()
+            .scrollContentBackground(.hidden)
         }
         .sheet(isPresented: $showingSignUp) {
-            SignupView()
-                .environmentObject(auth)
+            SignupView().environmentObject(auth)
         }
         .onAppear {
-            // if returning to login screen, keep the last username around
             if username.isEmpty { username = auth.username }
         }
+    }
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Schedoosh")
+                .font(.system(size: 34, weight: .bold, design: .rounded))
+                .foregroundStyle(AppColors.textPrimary)
+
+            Text("Check in on time. Compete with friends. Keep it simple.")
+                .font(.system(size: 16, weight: .medium, design: .rounded))
+                .foregroundStyle(AppColors.textSecondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.top, 10)
     }
 }

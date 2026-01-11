@@ -10,30 +10,46 @@ struct SignupView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section("Create account") {
-                    TextField("Username", text: $username)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-
-                    NoAutofillSecureField("Password", text: $password)
-                    .frame(height: 22)
-
-                    NoAutofillSecureField("Confirm password", text: $confirmPassword)
-                    .frame(height: 22)
-                }
-
-                if !auth.registeredUsernames.isEmpty {
-                    Section("Taken usernames (local demo)") {
-                        Text(auth.registeredUsernames.joined(separator: ", "))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+            ScrollView {
+                VStack(spacing: 18) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Create account")
+                            .font(.system(size: 30, weight: .bold, design: .rounded))
+                            .foregroundStyle(AppColors.textPrimary)
+                        Text("Demo signup checks usernames locally for now.")
+                            .font(.system(size: 15, weight: .medium, design: .rounded))
+                            .foregroundStyle(AppColors.textSecondary)
                     }
-                }
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
-                Section {
+                    VStack(spacing: 12) {
+                        TextField("Username", text: $username)
+                            .appTextField()
+
+                        NoAutofillSecureField("Password", text: $password)
+                            .frame(height: 48)
+                            .appTextField()
+
+                        NoAutofillSecureField("Confirm password", text: $confirmPassword)
+                            .frame(height: 48)
+                            .appTextField()
+                    }
+                    .appCard()
+
+                    if !auth.registeredUsernames.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Taken usernames (local)")
+                                .font(.headline)
+                                .foregroundStyle(.white)
+                            Text(auth.registeredUsernames.sorted().joined(separator: ", "))
+                                .font(.caption)
+                                .foregroundStyle(AppColors.textSecondary)
+                        }
+                        .appCard()
+                    }
+
                     Button {
-                        let u = username
+                        let u = username.trimmingCharacters(in: .whitespacesAndNewlines)
                         let p = password
                         let c = confirmPassword
                         Task { @MainActor in
@@ -41,38 +57,42 @@ struct SignupView: View {
                             if ok { dismiss() }
                         }
                     } label: {
-                        HStack {
-                            Spacer()
-                            if auth.isLoading {
-                                ProgressView()
-                            } else {
-                                Text("Sign Up")
-                            }
-                            Spacer()
+                        if auth.isLoading {
+                            ProgressView().tint(.white)
+                        } else {
+                            Text("Sign Up")
                         }
                     }
-                    .disabled(auth.isLoading)
+                    .buttonStyle(PrimaryButtonStyle())
+                    .disabled(auth.isLoading || username.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
 
-                    Text("Demo mode: signup checks username uniqueness locally. Replace the TODO in AuthStore.signUp(...) with a real API call later.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                if let err = auth.lastError, !err.isEmpty {
-                    Section("Error") {
-                        Text(err).foregroundStyle(.red)
+                    if let err = auth.lastError, !err.isEmpty {
+                        Text(err)
+                            .font(.footnote)
+                            .foregroundStyle(AppColors.danger)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
                     }
+
+                    Text("Replace the TODO in AuthStore.signUp(...) with a real API call later.")
+                        .font(.caption)
+                        .foregroundStyle(AppColors.textSecondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
                 }
+                .padding(20)
             }
-            .navigationTitle("Sign Up")
+            .scrollDismissesKeyboard(.interactively)
+            .navigationTitle("")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Close") { dismiss() }
+                        .foregroundStyle(.white)
                 }
             }
-        }
-        .onAppear {
-            auth.lastError = nil
+            .appScreen()
+            .onAppear { auth.lastError = nil }
         }
     }
 }
