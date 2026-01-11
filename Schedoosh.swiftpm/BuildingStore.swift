@@ -8,6 +8,11 @@
 import Foundation
 import CoreLocation
 
+func normalizeBuildingCode(_ raw: String) -> String {
+    raw.filter(\.isLetter).uppercased()
+}
+
+
 enum BuildingCode {
     static func normalize(_ raw: String) -> String {
         raw.filter(\.isLetter).uppercased()
@@ -22,8 +27,9 @@ struct Building: Codable, Hashable {
     let radiusMeters: Double?
 
     var normalizedCode: String {
-        BuildingCode.normalize(code)
+        normalizeBuildingCode(code)
     }
+
 
 
     var coordinate: CLLocationCoordinate2D {
@@ -39,7 +45,9 @@ struct Building: Codable, Hashable {
 final class BuildingStore: ObservableObject {
     @Published private(set) var buildingsByCode: [String: Building] = [:]
     @Published private(set) var loadError: String? = nil
-    
+    nonisolated static func normalize(_ raw: String) -> String {
+        raw.filter(\.isLetter).uppercased()
+    }
 
     init() {
         reload()
@@ -60,8 +68,9 @@ final class BuildingStore: ObservableObject {
 
     func building(for code: String?) -> Building? {
         guard let code else { return nil }
-        return buildingsByCode[BuildingCode.normalize(code)]
+        return buildingsByCode[normalizeBuildingCode(code)]
     }
+
 
     func coordinate(for code: String?) -> CLLocationCoordinate2D? {
         building(for: code)?.coordinate
@@ -79,20 +88,57 @@ final class BuildingStore: ObservableObject {
 
 
     private func loadBuildingsJSON(named name: String) throws -> [Building] {
-        // Try common bundle locations for Swift Playgrounds projects
-        let urlCandidates: [URL?] = [
-            Bundle.main.url(forResource: name, withExtension: "json"),
-            Bundle.main.url(forResource: name, withExtension: "json", subdirectory: "Resources"),
-            Bundle.main.bundleURL.appendingPathComponent("\(name).json")
-        ]
+        let fm = FileManager.default
 
-        guard let url = urlCandidates.compactMap({ $0 }).first(where: { FileManager.default.fileExists(atPath: $0.path) }) else {
-            throw NSError(domain: "BuildingStore", code: 1, userInfo: [
-                NSLocalizedDescriptionKey: "Could not find \(name).json in app bundle. Make sure it’s added as a Resource."
-            ])
+        // In SwiftPM/Playgrounds, resources might be in a separate bundle.
+        // Search main + all bundles + all frameworks.
+        let bundlesToSearch: [Bundle] = {
+            var seen = Set<ObjectIdentifier>()
+            var out: [Bundle] = []
+
+            func add(_ b: Bundle) {
+                let id = ObjectIdentifier(b)
+                guard !seen.contains(id) else { return }
+                seen.insert(id)
+                out.append(b)
+            }
+
+            add(.main)
+            Bundle.allBundles.forEach(add)
+            Bundle.allFrameworks.forEach(add)
+            return out
+        }()
+
+        // 1) Normal resource lookup
+        for b in bundlesToSearch {
+            if let url =
+                b.url(forResource: name, withExtension: "json") ??
+                b.url(forResource: name, withExtension: "json", subdirectory: "Resources")
+            {
+                let data = try Data(contentsOf: url)
+                return try JSONDecoder().decode([Building].self, from: data)
+            }
         }
 
-        let data = try Data(contentsOf: url)
-        return try JSONDecoder().decode([Building].self, from: data)
+        // 2) File-path fallback inside resource directories
+        for b in bundlesToSearch {
+            guard let resourceURL = b.resourceURL else { continue }
+
+            let candidates = [
+                resourceURL.appendingPathComponent("\(name).json"),
+                resourceURL.appendingPathComponent("Resources/\(name).json")
+            ]
+
+            for url in candidates where fm.fileExists(atPath: url.path) {
+                let data = try Data(contentsOf: url)
+                return try JSONDecoder().decode([Building].self, from: data)
+            }
+        }
+
+        throw NSError(domain: "BuildingStore", code: 1, userInfo: [
+            NSLocalizedDescriptionKey: "Could not find \(name).json in any bundle. Ensure it exists at Resources/\(name).json in the project."
+        ])
     }
+
+
 }

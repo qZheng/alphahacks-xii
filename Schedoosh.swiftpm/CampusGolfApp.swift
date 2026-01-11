@@ -2,11 +2,12 @@ import SwiftUI
 
 @main
 struct SchedooshApp: App {
-    @StateObject private var store = DataStore()
+    @StateObject private var store: DataStore
     @StateObject private var engine: AttendanceEngine
+
     @StateObject private var auth = AuthStore()
     @StateObject private var location = LocationManager()
-    @StateObject private var buildings = BuildingStore() 
+    @StateObject private var buildings = BuildingStore()
 
     init() {
         let store = DataStore()
@@ -40,6 +41,8 @@ struct SchedooshApp: App {
                         store.clearAll()
                     }
                 }
+                .environmentObject(location)
+                .environmentObject(buildings)
         }
     }
 }
