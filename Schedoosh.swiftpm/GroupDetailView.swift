@@ -2,12 +2,20 @@ import SwiftUI
 
 struct GroupDetailView: View {
     @EnvironmentObject var store: DataStore
+    @Environment(\.dismiss) private var dismiss
     let groupID: UUID
 
-    @State private var newMemberName: String = ""
+    @State private var showingInvite = false
+    @State private var inviteUsername = ""
+    @State private var showingLeaveConfirmation = false
 
     private var groupIndex: Int? {
         store.groups.firstIndex(where: { $0.id == groupID })
+    }
+    
+    private var currentGroup: Group? {
+        guard let gi = groupIndex else { return nil }
+        return store.groups[gi]
     }
 
     var body: some View {
@@ -21,9 +29,9 @@ struct GroupDetailView: View {
 
                         leaderboardCard(group: store.groups[gi])
 
-                        addMemberCard(gi: gi)
-
                         infoCard()
+                        
+                        leaveButton
                     }
                     .padding(16)
                 }
@@ -31,9 +39,98 @@ struct GroupDetailView: View {
                 .appScreen()
                 .navigationTitle("")
                 .navigationBarTitleDisplayMode(.inline)
+                .tint(.white)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button {
+                            showingInvite = true
+                        } label: {
+                            Image(systemName: "plus")
+                        }
+                    }
+                }
+                .sheet(isPresented: $showingInvite) {
+                    inviteSheet
+                }
+                .alert("Leave Group", isPresented: $showingLeaveConfirmation) {
+                    Button("Cancel", role: .cancel) {}
+                    Button("Leave", role: .destructive) {
+                        if let group = currentGroup {
+                            Task {
+                                await store.leaveGroup(group)
+                                await MainActor.run {
+                                    dismiss()
+                                }
+                            }
+                        }
+                    }
+                } message: {
+                    Text("Are you sure you want to leave this group?")
+                }
             } else {
                 Text("Group not found.")
                     .foregroundStyle(Theme.textSecondary)
+            }
+        }
+    }
+    
+    private var inviteSheet: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 16) {
+                    Text("Invite User")
+                        .font(.system(size: 30, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                    VStack(spacing: 12) {
+                        TextField("Username", text: $inviteUsername)
+                            .appTextField()
+                    }
+                    .appCard()
+
+                    Button("Invite") {
+                        inviteUser()
+                    }
+                    .buttonStyle(PrimaryButtonStyle())
+                    .disabled(inviteUsername.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    
+                    if let error = store.lastError {
+                        Text(error)
+                            .font(.footnote)
+                            .foregroundStyle(AppColors.danger)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
+                    }
+                }
+                .padding(20)
+            }
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Close") {
+                        showingInvite = false
+                        inviteUsername = ""
+                        store.lastError = nil
+                    }
+                    .foregroundStyle(.white)
+                }
+            }
+            .scrollContentBackground(.hidden)
+            .appScreen()
+        }
+    }
+    
+    private func inviteUser() {
+        let username = inviteUsername.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !username.isEmpty, let group = currentGroup else { return }
+        
+        Task {
+            await store.inviteUser(username, to: group)
+            await MainActor.run {
+                if store.lastError == nil {
+                    inviteUsername = ""
+                    showingInvite = false
+                }
             }
         }
     }
@@ -131,52 +228,32 @@ struct GroupDetailView: View {
         .softCard()
     }
 
-    private func addMemberCard(gi: Int) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Add member (local)")
-                .font(.headline)
-                .foregroundStyle(.white)
-
-            TextField("Name", text: $newMemberName)
-                .softField()
-                
-
-            Button {
-                addMember(gi: gi)
-            } label: {
-                Text("Add")
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(PrimaryButtonStyle())
-            .disabled(newMemberName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-
-            Button {
-                Task {
-                    await store.reconcileMeInGroups()
-                }
-            } label: {
-                Text("Sync your points")
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(SecondaryButtonStyle())
-        }
-        .softCard()
-    }
-
     private func infoCard() -> some View {
-        Text("This is local-only. To sync points across phones, you’d need accounts + a backend (Firebase/CloudKit/etc).")
+        Text("All data is synced with the server. Points and member information are managed server-side.")
             .font(.caption)
             .foregroundStyle(Theme.textSecondary)
             .softCard()
     }
-
-    // MARK: - Actions
-
-    private func addMember(gi: Int) {
-        let name = newMemberName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !name.isEmpty else { return }
-        store.groups[gi].members.append(Member(name: name, points: 0, isMe: false))
-        newMemberName = ""
+    
+    private var leaveButton: some View {
+        Button {
+            showingLeaveConfirmation = true
+        } label: {
+            HStack {
+                Image(systemName: "rectangle.portrait.and.arrow.right")
+                    .fontWeight(.semibold)
+                Text("Leave Group")
+                    .fontWeight(.semibold)
+            }
+            .foregroundStyle(.red)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+            .background(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(Color.red.opacity(0.15))
+            )
+        }
+        .buttonStyle(.plain)
     }
 }
 

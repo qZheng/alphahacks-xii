@@ -72,7 +72,11 @@ struct ClassesView: View {
             } message: {
                 Text(importAlertText)
             }
-
+            .onAppear {
+                Task {
+                    await store.fetchClasses()
+                }
+            }
             .sheet(isPresented: $showingAdd) {
                 NavigationStack { EditClassView(mode: .add) }
             }

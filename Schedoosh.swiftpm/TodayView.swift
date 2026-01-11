@@ -14,8 +14,8 @@ struct TodayView: View {
                     header
                     scoreCard
                     nextClassCard
-                    todayScheduleCard
-                    actionsCard
+                    dailyScheduleCard
+                    weeklyScheduleCard
                 }
                 .padding(20)
             }
@@ -25,6 +25,7 @@ struct TodayView: View {
             .navigationBarTitleDisplayMode(.inline)
         }
         .task {
+            // This triggers the permission prompt on first launch (status == .notDetermined)
             _ = await location.requestAuthorizationIfNeeded()
         }
     }
@@ -71,9 +72,17 @@ struct TodayView: View {
     private var nextClassCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("Next class")
-                    .font(.headline)
-                    .foregroundStyle(AppColors.textSecondary)
+                if let (c, d) = engine.nextClassToday() {
+                    let now = Date()
+                    let isCurrent = now >= d.addingTimeInterval(-10 * 60) && now <= d.addingTimeInterval(10 * 60)
+                    Text(isCurrent ? "Current class" : "Next class")
+                        .font(.headline)
+                        .foregroundStyle(AppColors.textSecondary)
+                } else {
+                    Text("Next class")
+                        .font(.headline)
+                        .foregroundStyle(AppColors.textSecondary)
+                }
                 Spacer()
                 Image(systemName: "calendar")
                     .foregroundStyle(AppColors.textSecondary)
@@ -123,12 +132,12 @@ struct TodayView: View {
         .safeCard()
     }
 
-    private var todayScheduleCard: some View {
+    private var dailyScheduleCard: some View {
         let todays = todaysClasses()
 
         return VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("Schedule")
+                Text("Daily Schedule")
                     .font(.headline)
                     .foregroundStyle(AppColors.textSecondary)
                 Spacer()
@@ -157,6 +166,65 @@ struct TodayView: View {
             }
         }
         .safeCard()
+    }
+    
+    private var weeklyScheduleCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Weekly Schedule")
+                    .font(.headline)
+                    .foregroundStyle(AppColors.textSecondary)
+                Spacer()
+            }
+
+            VStack(spacing: 12) {
+                ForEach(1...7, id: \.self) { weekday in
+                    let items = weeklyClasses(for: weekday)
+                    if !items.isEmpty {
+                        weekdayRow(weekday: weekday, items: items)
+                    }
+                }
+            }
+        }
+        .safeCard()
+    }
+    
+    private func weekdayRow(weekday: Int, items: [ClassItem]) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(weekdayName(weekday))
+                    .font(.system(size: 16, weight: .semibold, design: .rounded))
+                    .foregroundStyle(AppColors.accentPop)
+                Spacer()
+                Text("\(items.count)")
+                    .font(.caption)
+                    .foregroundStyle(AppColors.textSecondary)
+                    .padding(.vertical, 4)
+                    .padding(.horizontal, 8)
+                    .background(Capsule().fill(Color.white.opacity(0.10)))
+            }
+            
+            VStack(spacing: 6) {
+                ForEach(items) { c in
+                    HStack(spacing: 10) {
+                        Text(String(format: "%02d:%02d", c.hour, c.minute))
+                            .font(.system(size: 13, weight: .semibold, design: .rounded))
+                            .foregroundStyle(.white)
+                            .padding(.vertical, 4)
+                            .padding(.horizontal, 8)
+                            .background(Capsule().fill(Color.white.opacity(0.10)))
+                            .frame(width: 60, alignment: .leading)
+                        
+                        Text(c.title)
+                            .font(.system(size: 14, weight: .medium, design: .rounded))
+                            .foregroundStyle(AppColors.textSecondary)
+                        
+                        Spacer()
+                    }
+                }
+            }
+        }
+        .padding(.vertical, 8)
     }
 
     private func scheduleRow(_ c: ClassItem) -> some View {
@@ -209,28 +277,6 @@ struct TodayView: View {
         return AppColors.textSecondary
     }
 
-    private var actionsCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Actions")
-                .font(.headline)
-                .foregroundStyle(AppColors.textSecondary)
-
-            Button {
-                engine.manualCheckNow()
-            } label: {
-                Text("Run Score Check Now")
-            }
-            .buttonStyle(SecondaryButtonStyle())
-
-            if !engine.lastCheckMessage.isEmpty {
-                Text(engine.lastCheckMessage)
-                    .font(.caption)
-                    .foregroundStyle(AppColors.textSecondary)
-            }
-        }
-        .safeCard()
-    }
-
     private func todaysClasses() -> [ClassItem] {
         let now = Date()
         let cal = Calendar.current
@@ -238,6 +284,18 @@ struct TodayView: View {
         return store.classes
             .filter { $0.enabled && $0.weekday == todayWeekday }
             .sorted { ($0.hour, $0.minute) < ($1.hour, $1.minute) }
+    }
+    
+    private func weeklyClasses(for weekday: Int) -> [ClassItem] {
+        store.classes
+            .filter { $0.enabled && $0.weekday == weekday }
+            .sorted { ($0.hour, $0.minute) < ($1.hour, $1.minute) }
+    }
+    
+    private func weekdayName(_ w: Int) -> String {
+        let symbols = Calendar.current.weekdaySymbols
+        let i = max(1, min(7, w)) - 1
+        return symbols[i]
     }
 
     private func timeString(_ d: Date) -> String {

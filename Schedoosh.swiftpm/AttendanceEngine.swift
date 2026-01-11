@@ -159,7 +159,11 @@ final class AttendanceEngine: ObservableObject, @unchecked Sendable {
                 guard let d = cal.date(bySettingHour: c.hour, minute: c.minute, second: 0, of: now) else { return nil }
                 return (c, d)
             }
-            .filter { $0.1 >= now.addingTimeInterval(-3600) }
+            .filter { classItem, classDate in
+                // Show classes that are still within the check-in window (10 minutes after start)
+                let windowEnd = classDate.addingTimeInterval(checkInBufferSeconds)
+                return windowEnd > now
+            }
 
         return candidates.sorted(by: { $0.1 < $1.1 }).first
     }
@@ -181,7 +185,9 @@ final class AttendanceEngine: ObservableObject, @unchecked Sendable {
             let window = checkInWindow(for: start)
             if now > window.closesAt {
                 store.missedKeys.insert(key)
-                store.addPoint()
+                Task {
+                    await store.addPoint()
+                }
                 didScore = true
                 lastCheckMessage = "Missed \(c.title) (\(timeString(c))) → +1 point"
             }

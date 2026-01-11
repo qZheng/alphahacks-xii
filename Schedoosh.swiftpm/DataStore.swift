@@ -169,13 +169,15 @@ final class DataStore: ObservableObject {
             groupIdMap.removeAll()
             groups = []
             
+            // Get current user ID once before the loop to avoid repeated API calls
+            let currentUserId = await getCurrentUserId(token: token)
+            
             for groupListResponse in groupListResponses {
                 let groupDetail = await fetchGroupDetail(groupId: groupListResponse.id, token: token)
                 if let groupDetail = groupDetail {
                     let groupUUID = uuidFromInt(groupListResponse.id)
                     groupIdMap[groupListResponse.id] = groupUUID
                     
-                    let currentUserId = await getCurrentUserId(token: token)
                     let members = groupDetail.members.map { memberResponse in
                         let memberUUID = uuidFromInt(memberResponse.id)
                         memberIdMap[memberResponse.id] = memberUUID
@@ -212,7 +214,11 @@ final class DataStore: ObservableObject {
         
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
-            guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            guard let httpResponse = response as? HTTPURLResponse else {
+                return nil
+            }
+            
+            guard httpResponse.statusCode == 200 else {
                 return nil
             }
             
@@ -235,7 +241,11 @@ final class DataStore: ObservableObject {
         
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
-            guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            guard let httpResponse = response as? HTTPURLResponse else {
+                return nil
+            }
+            
+            guard httpResponse.statusCode == 200 else {
                 return nil
             }
             
@@ -249,28 +259,50 @@ final class DataStore: ObservableObject {
     
     // MARK: - Data Modification
     
-    func addPoint() {
-        profile.points += 1
-        Task {
-            await syncScoreToServer()
-            await reconcileMeInGroups()
+    func addPoint() async {
+        guard let token = authStore?.authToken() else {
+            lastError = "Not authenticated"
+            return
         }
-    }
-    
-    private func syncScoreToServer() async {
-        // Note: Backend doesn't have an endpoint to update score yet
-        // For now, we'll just update locally and it will sync on next refresh
-        // In a full implementation, you'd add a PATCH /api/me endpoint
-    }
-    
-    func reconcileMeInGroups() async {
-        for gi in groups.indices {
-            for mi in groups[gi].members.indices {
-                if groups[gi].members[mi].isMe {
-                    groups[gi].members[mi].name = profile.name
-                    groups[gi].members[mi].points = profile.points
+        
+        // Get current score and increment
+        let newScore = profile.points + 1
+        
+        guard let url = URL(string: "\(baseURL)/api/me") else {
+            lastError = "Invalid URL"
+            return
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "PATCH"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        let body: [String: Int] = ["score": newScore]
+        
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let httpResponse = response as? HTTPURLResponse else {
+                lastError = "Invalid response"
+                return
+            }
+            
+            if httpResponse.statusCode == 200 {
+                // Refresh profile and groups from server to get updated data
+                await fetchProfile()
+                await fetchGroups()
+            } else {
+                // Try to read error message from response
+                if let errorData = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let errorMessage = errorData["error"] as? String {
+                    lastError = "Failed to update score: \(errorMessage)"
+                } else {
+                    lastError = "Failed to update score: \(httpResponse.statusCode)"
                 }
             }
+        } catch {
+            lastError = "Failed to update score: \(error.localizedDescription)"
         }
     }
     
@@ -324,7 +356,13 @@ final class DataStore: ObservableObject {
             if httpResponse.statusCode == 201 {
                 await fetchClasses() // Refresh from server to get the ID
             } else {
-                lastError = "Failed to create class: \(httpResponse.statusCode)"
+                // Try to read error message from response
+                if let errorData = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let errorMessage = errorData["error"] as? String {
+                    lastError = "Failed to create class: \(errorMessage)"
+                } else {
+                    lastError = "Failed to create class: \(httpResponse.statusCode)"
+                }
             }
         } catch {
             lastError = "Failed to create class: \(error.localizedDescription)"
@@ -364,7 +402,7 @@ final class DataStore: ObservableObject {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         
         do {
-            let (_, response) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await URLSession.shared.data(for: request)
             guard let httpResponse = response as? HTTPURLResponse else {
                 lastError = "Invalid response"
                 return
@@ -373,7 +411,13 @@ final class DataStore: ObservableObject {
             if httpResponse.statusCode == 200 {
                 await fetchClasses() // Refresh from server
             } else {
-                lastError = "Failed to delete class: \(httpResponse.statusCode)"
+                // Try to read error message from response
+                if let errorData = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let errorMessage = errorData["error"] as? String {
+                    lastError = "Failed to delete class: \(errorMessage)"
+                } else {
+                    lastError = "Failed to delete class: \(httpResponse.statusCode)"
+                }
             }
         } catch {
             lastError = "Failed to delete class: \(error.localizedDescription)"
@@ -401,7 +445,7 @@ final class DataStore: ObservableObject {
         let body: [String: String] = ["name": name]
         
         do {
-            request.httpBody = try JSONEncoder().encode(body)
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
             let (data, response) = try await URLSession.shared.data(for: request)
             guard let httpResponse = response as? HTTPURLResponse else {
                 lastError = "Invalid response"
@@ -411,7 +455,13 @@ final class DataStore: ObservableObject {
             if httpResponse.statusCode == 201 {
                 await fetchGroups() // Refresh from server
             } else {
-                lastError = "Failed to create group: \(httpResponse.statusCode)"
+                // Try to read error message from response
+                if let errorData = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let errorMessage = errorData["error"] as? String {
+                    lastError = "Failed to create group: \(errorMessage)"
+                } else {
+                    lastError = "Failed to create group: \(httpResponse.statusCode)"
+                }
             }
         } catch {
             lastError = "Failed to create group: \(error.localizedDescription)"
@@ -426,6 +476,53 @@ final class DataStore: ObservableObject {
         
         // For now, leave the group (backend doesn't have delete endpoint)
         await leaveGroup(group)
+    }
+    
+    func inviteUser(_ username: String, to group: Group) async {
+        guard let token = authStore?.authToken() else {
+            lastError = "Not authenticated"
+            return
+        }
+        
+        guard let backendId = groupIdMap.first(where: { $0.value == group.id })?.key else {
+            lastError = "Group not found"
+            return
+        }
+        
+        guard let url = URL(string: "\(baseURL)/api/groups/\(backendId)/invite") else {
+            lastError = "Invalid URL"
+            return
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        let body: [String: String] = ["username": username]
+        
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let httpResponse = response as? HTTPURLResponse else {
+                lastError = "Invalid response"
+                return
+            }
+            
+            if httpResponse.statusCode == 200 {
+                await fetchGroups() // Refresh from server
+            } else {
+                // Try to read error message from response
+                if let errorData = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let errorMessage = errorData["error"] as? String {
+                    lastError = "Failed to invite user: \(errorMessage)"
+                } else {
+                    lastError = "Failed to invite user: \(httpResponse.statusCode)"
+                }
+            }
+        } catch {
+            lastError = "Failed to invite user: \(error.localizedDescription)"
+        }
     }
     
     func leaveGroup(_ group: Group) async {
@@ -450,7 +547,7 @@ final class DataStore: ObservableObject {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         
         do {
-            let (_, response) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await URLSession.shared.data(for: request)
             guard let httpResponse = response as? HTTPURLResponse else {
                 lastError = "Invalid response"
                 return
@@ -459,7 +556,13 @@ final class DataStore: ObservableObject {
             if httpResponse.statusCode == 200 {
                 await fetchGroups() // Refresh from server
             } else {
-                lastError = "Failed to leave group: \(httpResponse.statusCode)"
+                // Try to read error message from response
+                if let errorData = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let errorMessage = errorData["error"] as? String {
+                    lastError = "Failed to leave group: \(errorMessage)"
+                } else {
+                    lastError = "Failed to leave group: \(httpResponse.statusCode)"
+                }
             }
         } catch {
             lastError = "Failed to leave group: \(error.localizedDescription)"

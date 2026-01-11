@@ -27,7 +27,12 @@ struct SettingsView: View {
             .appScreen()
             .scrollContentBackground(.hidden)
             .navigationBarTitleDisplayMode(.inline)
-            .onAppear { name = store.profile.name }
+            .onAppear { 
+                name = store.profile.name
+                Task {
+                    await store.fetchProfile()
+                }
+            }
         }
         
     }
@@ -94,15 +99,16 @@ struct SettingsView: View {
                 .appTextField()
 
             Button {
-                store.profile.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+                // Note: Profile name updates are not currently supported by the backend
+                // The name is managed server-side via the username
                 Task {
-                    await store.reconcileMeInGroups()
+                    await store.fetchProfile()
+                    await store.fetchGroups()
                 }
             } label: {
-                Text("Save name")
+                Text("Refresh")
             }
             .buttonStyle(PrimaryButtonStyle())
-            .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
         .appCard()
     }
