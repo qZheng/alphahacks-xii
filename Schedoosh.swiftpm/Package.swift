@@ -17,11 +17,11 @@ let package = Package(
             name: "Schedoosh",
             targets: ["AppModule"],
             bundleIdentifier: "com.Schadoosh.Schedoosh",
-            teamIdentifier: "U42QPW3ZVB",
+            teamIdentifier: "UMJRA94U52",
             displayVersion: "1.0",
             bundleVersion: "1",
-            appIcon: .placeholder(icon: .note),
-            accentColor: .presetColor(.teal),
+            appIcon: .asset("AppIcon"),
+            accentColor: .presetColor(.mint),
             supportedDeviceFamilies: [
                 .pad,
                 .phone

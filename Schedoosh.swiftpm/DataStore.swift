@@ -86,6 +86,20 @@ final class DataStore: ObservableObject {
         saveKeys()
     }
     
+
+    // MARK: - Auth / 401 handling
+    private func handleUnauthorized(_ statusCode: Int) -> Bool {
+        guard statusCode == 401 || statusCode == 403 else { return false }
+
+        // Clear local state so the UI doesn't show stale/blank content.
+        profile = UserProfile()
+        classes = []
+        groups = []
+
+        lastError = "Session expired. Please log in again."
+        authStore?.logout(reason: "Session expired. Please log in again.")
+        return true
+    }
     // MARK: - Data Fetching
     
     /// Fetch all data from the server
@@ -99,6 +113,7 @@ final class DataStore: ObservableObject {
     func fetchProfile() async {
         guard let token = authStore?.authToken() else {
             lastError = "Not authenticated"
+            authStore?.logout(reason: "Please log in again.")
             return
         }
         
@@ -118,6 +133,8 @@ final class DataStore: ObservableObject {
                 lastError = "Invalid response"
                 return
             }
+
+            if handleUnauthorized(httpResponse.statusCode) { return }
             
             if httpResponse.statusCode != 200 {
                 lastError = "Failed to fetch profile: \(httpResponse.statusCode)"
@@ -140,6 +157,7 @@ final class DataStore: ObservableObject {
     func fetchClasses() async {
         guard let token = authStore?.authToken() else {
             lastError = "Not authenticated"
+            authStore?.logout(reason: "Please log in again.")
             return
         }
         
@@ -159,6 +177,8 @@ final class DataStore: ObservableObject {
                 lastError = "Invalid response"
                 return
             }
+
+            if handleUnauthorized(httpResponse.statusCode) { return }
             
             if httpResponse.statusCode != 200 {
                 lastError = "Failed to fetch classes: \(httpResponse.statusCode)"
@@ -195,6 +215,7 @@ final class DataStore: ObservableObject {
     func fetchGroups() async {
         guard let token = authStore?.authToken() else {
             lastError = "Not authenticated"
+            authStore?.logout(reason: "Please log in again.")
             return
         }
         
@@ -214,6 +235,8 @@ final class DataStore: ObservableObject {
                 lastError = "Invalid response"
                 return
             }
+
+            if handleUnauthorized(httpResponse.statusCode) { return }
             
             if httpResponse.statusCode != 200 {
                 lastError = "Failed to fetch groups: \(httpResponse.statusCode)"
@@ -275,6 +298,8 @@ final class DataStore: ObservableObject {
             guard let httpResponse = response as? HTTPURLResponse else {
                 return nil
             }
+
+            if handleUnauthorized(httpResponse.statusCode) { return nil }
             
             guard httpResponse.statusCode == 200 else {
                 return nil
@@ -302,6 +327,8 @@ final class DataStore: ObservableObject {
             guard let httpResponse = response as? HTTPURLResponse else {
                 return nil
             }
+
+            if handleUnauthorized(httpResponse.statusCode) { return nil }
             
             guard httpResponse.statusCode == 200 else {
                 return nil
@@ -320,6 +347,7 @@ final class DataStore: ObservableObject {
     func addPoint() async {
         guard let token = authStore?.authToken() else {
             lastError = "Not authenticated"
+            authStore?.logout(reason: "Please log in again.")
             return
         }
         
@@ -345,6 +373,8 @@ final class DataStore: ObservableObject {
                 lastError = "Invalid response"
                 return
             }
+
+            if handleUnauthorized(httpResponse.statusCode) { return }
             
             if httpResponse.statusCode == 200 {
                 // Refresh profile and groups from server to get updated data
@@ -384,6 +414,7 @@ final class DataStore: ObservableObject {
     func addClass(_ classItem: ClassItem) async {
         guard let token = authStore?.authToken() else {
             lastError = "Not authenticated"
+            authStore?.logout(reason: "Please log in again.")
             return
         }
         
@@ -414,6 +445,8 @@ final class DataStore: ObservableObject {
                 lastError = "Invalid response"
                 return
             }
+
+            if handleUnauthorized(httpResponse.statusCode) { return }
             
             if httpResponse.statusCode == 201 {
                 await fetchClasses() // Refresh from server to get the ID
@@ -445,6 +478,7 @@ final class DataStore: ObservableObject {
     func deleteClass(_ classItem: ClassItem) async {
         guard let token = authStore?.authToken() else {
             lastError = "Not authenticated"
+            authStore?.logout(reason: "Please log in again.")
             return
         }
         
@@ -469,6 +503,8 @@ final class DataStore: ObservableObject {
                 lastError = "Invalid response"
                 return
             }
+
+            if handleUnauthorized(httpResponse.statusCode) { return }
             
             if httpResponse.statusCode == 200 {
                 await fetchClasses() // Refresh from server
@@ -491,6 +527,7 @@ final class DataStore: ObservableObject {
     func createGroup(name: String) async {
         guard let token = authStore?.authToken() else {
             lastError = "Not authenticated"
+            authStore?.logout(reason: "Please log in again.")
             return
         }
         
@@ -513,6 +550,8 @@ final class DataStore: ObservableObject {
                 lastError = "Invalid response"
                 return
             }
+
+            if handleUnauthorized(httpResponse.statusCode) { return }
             
             if httpResponse.statusCode == 201 {
                 await fetchGroups() // Refresh from server
@@ -543,6 +582,7 @@ final class DataStore: ObservableObject {
     func inviteUser(_ username: String, to group: Group) async {
         guard let token = authStore?.authToken() else {
             lastError = "Not authenticated"
+            authStore?.logout(reason: "Please log in again.")
             return
         }
         
@@ -570,6 +610,8 @@ final class DataStore: ObservableObject {
                 lastError = "Invalid response"
                 return
             }
+
+            if handleUnauthorized(httpResponse.statusCode) { return }
             
             if httpResponse.statusCode == 200 {
                 await fetchGroups() // Refresh from server
@@ -590,6 +632,7 @@ final class DataStore: ObservableObject {
     func leaveGroup(_ group: Group) async {
         guard let token = authStore?.authToken() else {
             lastError = "Not authenticated"
+            authStore?.logout(reason: "Please log in again.")
             return
         }
         
@@ -614,6 +657,8 @@ final class DataStore: ObservableObject {
                 lastError = "Invalid response"
                 return
             }
+
+            if handleUnauthorized(httpResponse.statusCode) { return }
             
             if httpResponse.statusCode == 200 {
                 await fetchGroups() // Refresh from server

@@ -152,10 +152,10 @@ final class AuthStore: ObservableObject, @unchecked Sendable {
         }
     }
 
-    func logout() {
+    func logout(reason: String? = nil) {
         isLoggedIn = false
         username = ""
-        lastError = nil
+        lastError = reason
         setToken(nil)
         persistSession()
     }
