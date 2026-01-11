@@ -17,7 +17,7 @@ let package = Package(
             name: "Schedoosh",
             targets: ["AppModule"],
             bundleIdentifier: "com.Schadoosh.Schedoosh",
-            teamIdentifier: "U42QPW3ZVB",
+            teamIdentifier: "UMJRA94U52",
             displayVersion: "1.0",
             bundleVersion: "1",
             appIcon: .placeholder(icon: .note),
@@ -34,7 +34,11 @@ let package = Package(
             ],
             capabilities: [
                 .locationAlwaysAndWhenInUse(purposeString: "We use your location during class start times to verify attendance."),
+<<<<<<< Updated upstream
                 .calendars(purposeString: "We use canel")
+=======
+                .calendars(purposeString: "meow")
+>>>>>>> Stashed changes
             ]
         )
     ],

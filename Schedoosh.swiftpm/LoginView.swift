@@ -18,6 +18,7 @@ struct LoginView: View {
                             .appTextField()
 
                         NoAutofillSecureField("Password", text: $password)
+                            .frame(height: 48)
                             .appTextField()
                     }
                     .appCard()
@@ -45,15 +46,6 @@ struct LoginView: View {
                             .multilineTextAlignment(.center)
                             .padding(.horizontal)
                     }
-
-                    VStack(spacing: 6) {
-                        Text("Demo mode: any username/password works.")
-                        Text("Replace the TODO in AuthStore.login(...) with a real API call later.")
-                    }
-                    .font(.caption)
-                    .foregroundStyle(AppColors.textSecondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal)
 
                     Button {
                         showingSignUp = true

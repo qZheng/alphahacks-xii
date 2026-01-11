@@ -12,4 +12,4 @@ def me():
     user = db.session.get(User, user_id)
     if user is None:
         return jsonify(error="User not found"), 404
-    return jsonify(id=user.id, username=user.username)
+    return jsonify(id=user.id, username=user.username, score=user.score)

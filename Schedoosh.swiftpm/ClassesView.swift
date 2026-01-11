@@ -201,12 +201,15 @@ struct ClassesView: View {
     }
 
     private func toggleEnabled(_ c: ClassItem) {
+        // Note: Backend doesn't support enabled field, so this only updates locally
         guard let idx = store.classes.firstIndex(where: { $0.id == c.id }) else { return }
         store.classes[idx].enabled.toggle()
     }
 
     private func delete(_ c: ClassItem) {
-        store.classes.removeAll { $0.id == c.id }
+        Task {
+            await store.deleteClass(c)
+        }
     }
 
     private func weekdayName(_ w: Int) -> String {

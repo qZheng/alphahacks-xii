@@ -92,7 +92,7 @@ def get_group(group_id):
     return jsonify({
         "id": group.id,
         "name": group.name,
-        "members": [{"id": m.id, "username": m.username} for m in group.members],
+        "members": [{"id": m.id, "username": m.username, "score": m.score} for m in group.members],
     }), 200
 
 

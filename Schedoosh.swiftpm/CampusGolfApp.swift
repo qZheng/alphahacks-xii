@@ -20,8 +20,29 @@ struct SchedooshApp: App {
                 .environmentObject(store)
                 .environmentObject(engine)
                 .environmentObject(auth)
+<<<<<<< Updated upstream
                 .environmentObject(buildings)
                 .environmentObject(location)
+=======
+                .environmentObject(location)
+                .onAppear {
+                    store.authStore = auth
+                    Task {
+                        if auth.isLoggedIn {
+                            await store.refresh()
+                        }
+                    }
+                }
+                .onChange(of: auth.isLoggedIn) { newValue in
+                    if newValue {
+                        Task {
+                            await store.refresh()
+                        }
+                    } else {
+                        store.clearAll()
+                    }
+                }
+>>>>>>> Stashed changes
         }
     }
 }

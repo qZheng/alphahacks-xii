@@ -164,35 +164,43 @@ struct EditClassView: View {
         hour = cal.component(.hour, from: time)
         minute = cal.component(.minute, from: time)
 
-        switch mode {
-        case .add:
-            let c = ClassItem(
-                title: cleanTitle,
-                weekday: weekday,
-                hour: hour,
-                minute: minute,
-                enabled: enabled
-            )
-            store.classes.append(c)
-
-        case .edit(let existing):
-            guard let idx = store.classes.firstIndex(where: { $0.id == existing.id }) else { return }
-            store.classes[idx] = ClassItem(
-                id: existing.id,
-                title: cleanTitle,
-                weekday: weekday,
-                hour: hour,
-                minute: minute,
-                enabled: enabled
-            )
+        Task {
+            switch mode {
+            case .add:
+                let c = ClassItem(
+                    title: cleanTitle,
+                    weekday: weekday,
+                    hour: hour,
+                    minute: minute,
+                    enabled: enabled
+                )
+                await store.addClass(c)
+                
+            case .edit(let existing):
+                let updated = ClassItem(
+                    id: existing.id,
+                    title: cleanTitle,
+                    weekday: weekday,
+                    hour: hour,
+                    minute: minute,
+                    enabled: enabled
+                )
+                await store.updateClass(updated)
+            }
+            await MainActor.run {
+                dismiss()
+            }
         }
-        dismiss()
     }
 
     private func delete() {
         if case .edit(let existing) = mode {
-            store.classes.removeAll { $0.id == existing.id }
+            Task {
+                await store.deleteClass(existing)
+                await MainActor.run {
+                    dismiss()
+                }
+            }
         }
-        dismiss()
     }
 }

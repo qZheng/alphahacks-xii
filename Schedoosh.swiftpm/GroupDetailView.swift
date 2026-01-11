@@ -151,7 +151,9 @@ struct GroupDetailView: View {
             .disabled(newMemberName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
 
             Button {
-                store.reconcileMeInGroups()
+                Task {
+                    await store.reconcileMeInGroups()
+                }
             } label: {
                 Text("Sync your points")
                     .frame(maxWidth: .infinity)

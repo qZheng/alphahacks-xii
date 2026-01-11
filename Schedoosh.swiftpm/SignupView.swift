@@ -16,7 +16,7 @@ struct SignupView: View {
                         Text("Create account")
                             .font(.system(size: 30, weight: .bold, design: .rounded))
                             .foregroundStyle(AppColors.textPrimary)
-                        Text("Demo signup checks usernames locally for now.")
+                        Text("Create a new account to get started.")
                             .font(.system(size: 15, weight: .medium, design: .rounded))
                             .foregroundStyle(AppColors.textSecondary)
                     }
@@ -35,18 +35,6 @@ struct SignupView: View {
                             .appTextField()
                     }
                     .appCard()
-
-                    if !auth.registeredUsernames.isEmpty {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Taken usernames (local)")
-                                .font(.headline)
-                                .foregroundStyle(.white)
-                            Text(auth.registeredUsernames.sorted().joined(separator: ", "))
-                                .font(.caption)
-                                .foregroundStyle(AppColors.textSecondary)
-                        }
-                        .appCard()
-                    }
 
                     Button {
                         let u = username.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -73,12 +61,6 @@ struct SignupView: View {
                             .multilineTextAlignment(.center)
                             .padding(.horizontal)
                     }
-
-                    Text("Replace the TODO in AuthStore.signUp(...) with a real API call later.")
-                        .font(.caption)
-                        .foregroundStyle(AppColors.textSecondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal)
                 }
                 .padding(20)
             }

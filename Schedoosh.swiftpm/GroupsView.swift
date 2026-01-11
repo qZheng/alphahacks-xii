@@ -37,8 +37,10 @@ struct GroupsView: View {
                                 }
                                 .buttonStyle(.plain)
                                 .contextMenu {
-                                    Button("Delete", role: .destructive) {
-                                        store.groups.removeAll { $0.id == g.id }
+                                    Button("Leave Group", role: .destructive) {
+                                        Task {
+                                            await store.leaveGroup(g)
+                                        }
                                     }
                                 }
                             }
@@ -129,11 +131,15 @@ struct GroupsView: View {
     }
 
     private func createGroup() {
-        let me = Member(name: store.profile.name, points: store.profile.points, isMe: true)
-        let g = Group(name: newGroupName.trimmingCharacters(in: .whitespacesAndNewlines), members: [me])
-        store.groups.append(g)
-        store.reconcileMeInGroups()
-        newGroupName = ""
-        showingAdd = false
+        let name = newGroupName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return }
+        
+        Task {
+            await store.createGroup(name: name)
+            await MainActor.run {
+                newGroupName = ""
+                showingAdd = false
+            }
+        }
     }
 }

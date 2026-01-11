@@ -88,7 +88,9 @@ struct SettingsView: View {
 
             Button {
                 store.profile.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
-                store.reconcileMeInGroups()
+                Task {
+                    await store.reconcileMeInGroups()
+                }
             } label: {
                 Text("Save name")
             }
