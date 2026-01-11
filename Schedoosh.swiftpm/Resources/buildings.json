@@ -1,0 +1,5 @@
+[
+  { "code": "ITB",  "name": "Information Technology Building", "lat": 43.2609, "lon": -79.9192, "radiusMeters": 150 },
+  { "code": "MDCL", "name": "Michael DeGroote Centre",         "lat": 43.2632, "lon": -79.9181, "radiusMeters": 200 },
+  { "code": "CH", "name": "Cole's house", "lat": 43.2591595935267, "lon": -79.92430199805463, "radiusMeters":100 }
+]
