@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 enum AppColors {
     static let spaceCadet = Color(hex: "18BF57")
@@ -8,6 +9,7 @@ enum AppColors {
     static let deepGreen = Color(hex: "18573B")
 
     static let accentPop = Color(hex: "2AAE86")
+    static let brightGreen = Color(hex: "2EFF6B")
 
     static let backgroundGradient = LinearGradient(
         colors: [spaceCadet, indigoDye, midnightGreen],
@@ -139,4 +141,9 @@ extension View {
     func appScreen() -> some View { self.modifier(AppBackground()) }
     func appCard(padding: CGFloat = 16) -> some View { self.modifier(AppCard(padding: padding)) }
     func appTextField() -> some View { self.modifier(AppTextFieldStyle()) }
+    func whiteNavigationBarTint() -> some View {
+        self.onAppear {
+            UINavigationBar.appearance().tintColor = .white
+        }
+    }
 }

@@ -26,6 +26,7 @@ struct SchedooshApp: App {
                 .environmentObject(location)
                 .onAppear {
                     store.authStore = auth
+                    store.cleanupOldKeys() // Clean up keys from previous weeks
                     Task {
                         if auth.isLoggedIn {
                             await store.refresh()
@@ -34,6 +35,8 @@ struct SchedooshApp: App {
                 }
                 .onChange(of: auth.isLoggedIn) { newValue in
                     if newValue {
+                        // Reload keys when logging in (in case user switched accounts)
+                        store.reloadKeys()
                         Task {
                             await store.refresh()
                         }

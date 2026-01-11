@@ -55,7 +55,10 @@ struct GroupsView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button { showingAdd = true } label: { Image(systemName: "plus") }
+                    Button { showingAdd = true } label: { 
+                        Image(systemName: "plus")
+                            .foregroundStyle(AppColors.brightGreen)
+                    }
                 }
             }
             .onAppear {
@@ -85,6 +88,7 @@ struct GroupsView: View {
                         .padding(20)
                     }
                     
+                    .navigationBarBackButtonHidden(true)
                     .toolbar {
                         ToolbarItem(placement: .topBarTrailing) {
                             Button("Close") { showingAdd = false }
@@ -92,8 +96,10 @@ struct GroupsView: View {
                         }
                     }
                     .scrollContentBackground(.hidden)
+                    .tint(.white)
                     .appScreen()
                 }
+                .tint(.white)
             }
         }
     }

@@ -19,6 +19,9 @@ struct GroupDetailView: View {
     }
 
     var body: some View {
+        let sorted = currentGroup?.members.sorted { $0.points < $1.points } ?? []
+        let isFirstPlace = sorted.firstIndex(where: { $0.isMe }) == 0
+        
         ZStack {
             Theme.bg.ignoresSafeArea()
 
@@ -39,14 +42,18 @@ struct GroupDetailView: View {
                 .appScreen()
                 .navigationTitle("")
                 .navigationBarTitleDisplayMode(.inline)
+                .navigationBarBackButtonHidden(true)
                 .tint(.white)
                 .toolbar {
-                    ToolbarItem(placement: .topBarTrailing) {
+                    ToolbarItemGroup(placement: .topBarTrailing) {
                         Button {
                             showingInvite = true
                         } label: {
                             Image(systemName: "plus")
+                                .foregroundStyle(AppColors.brightGreen)
                         }
+                        Button("Close") { dismiss() }
+                            .foregroundStyle(.white)
                     }
                 }
                 .sheet(isPresented: $showingInvite) {
@@ -70,6 +77,11 @@ struct GroupDetailView: View {
             } else {
                 Text("Group not found.")
                     .foregroundStyle(Theme.textSecondary)
+            }
+            
+            if isFirstPlace {
+                ConfettiView()
+                    .ignoresSafeArea()
             }
         }
     }
@@ -105,6 +117,7 @@ struct GroupDetailView: View {
                 }
                 .padding(20)
             }
+            .navigationBarBackButtonHidden(true)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Close") {
@@ -116,8 +129,10 @@ struct GroupDetailView: View {
                 }
             }
             .scrollContentBackground(.hidden)
+            .tint(.white)
             .appScreen()
         }
+        .tint(.white)
     }
     
     private func inviteUser() {
@@ -162,6 +177,10 @@ struct GroupDetailView: View {
 
     private func leaderboardCard(group: Group) -> some View {
         let sorted = group.members.sorted { $0.points < $1.points }
+        
+        // Find user's position (1-indexed)
+        let userPosition = sorted.firstIndex(where: { $0.isMe }).map { $0 + 1 } ?? nil
+        let placementEmoji = placementEmoji(for: userPosition)
 
         return VStack(alignment: .leading, spacing: 12) {
             HStack {
@@ -171,12 +190,13 @@ struct GroupDetailView: View {
 
                 Spacer()
 
-                Text("Lower is better")
-                    .font(.caption)
-                    .foregroundStyle(Theme.textSecondary)
-                    .padding(.vertical, 6)
-                    .padding(.horizontal, 10)
-                    .background(Capsule().fill(Color.white.opacity(0.10)))
+                if let emoji = placementEmoji {
+                    Text(emoji)
+                        .font(.title3)
+                        .padding(.vertical, 6)
+                        .padding(.horizontal, 10)
+                        .background(Capsule().fill(Color.white.opacity(0.10)))
+                }
             }
 
             VStack(spacing: 10) {
@@ -227,6 +247,16 @@ struct GroupDetailView: View {
         }
         .softCard()
     }
+    
+    private func placementEmoji(for position: Int?) -> String? {
+        guard let pos = position else { return nil }
+        switch pos {
+        case 1: return "🥇"
+        case 2: return "🥈"
+        case 3: return "🥉"
+        default: return "😰"
+        }
+    }
 
     private func infoCard() -> some View {
         Text("All data is synced with the server. Points and member information are managed server-side.")
@@ -260,10 +290,10 @@ struct GroupDetailView: View {
 // MARK: - Local Theme + Styles (Playgrounds-safe)
 
 private enum Theme {
-    static let bg = Color(hex: "182F57")
+    static let bg = Color(hex: "182F57", alpha: 1.0)
     static let card = Color.white.opacity(0.08)
-    static let accent = Color(hex: "1B6156")
-    static let accent2 = Color(hex: "19454B")
+    static let accent = Color(hex: "1B6156", alpha: 1.0)
+    static let accent2 = Color(hex: "19454B", alpha: 1.0)
     static let textSecondary = Color.white.opacity(0.70)
 }
 
@@ -295,21 +325,3 @@ private extension View {
     }
 }
 
-private extension Color {
-    init(hex: String) {
-        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
-        var int: UInt64 = 0
-        Scanner(string: hex).scanHexInt64(&int)
-        let a, r, g, b: UInt64
-        switch hex.count {
-        case 6: (a, r, g, b) = (255, (int >> 16) & 255, (int >> 8) & 255, int & 255)
-        case 8: (a, r, g, b) = ((int >> 24) & 255, (int >> 16) & 255, (int >> 8) & 255, int & 255)
-        default: (a, r, g, b) = (255, 0, 0, 0)
-        }
-        self.init(.sRGB,
-                  red: Double(r) / 255,
-                  green: Double(g) / 255,
-                  blue: Double(b) / 255,
-                  opacity: Double(a) / 255)
-    }
-}

@@ -38,6 +38,7 @@ struct ClassesView: View {
             .appScreen()
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
+            .tint(.white)
             .toolbar {
                 ToolbarItemGroup(placement: .topBarTrailing) {
 
@@ -64,6 +65,7 @@ struct ClassesView: View {
                         showingAdd = true
                     } label: {
                         Image(systemName: "plus")
+                            .foregroundStyle(AppColors.brightGreen)
                     }
                 }
             }
@@ -78,7 +80,10 @@ struct ClassesView: View {
                 }
             }
             .sheet(isPresented: $showingAdd) {
-                NavigationStack { EditClassView(mode: .add) }
+                NavigationStack { 
+                    EditClassView(mode: .add)
+                }
+                .tint(.white)
             }
         }
     }

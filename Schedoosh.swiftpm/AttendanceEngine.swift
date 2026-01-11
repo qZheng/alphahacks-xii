@@ -98,7 +98,7 @@ final class AttendanceEngine: ObservableObject, @unchecked Sendable {
             }
 
             // 4) Success
-            store.checkedInKeys.insert(key)
+            store.addCheckedInKey(key)
             lastCheckMessage = "Checked in: \(classItem.title) @ \(code) ✅"
 
         } catch {
@@ -183,8 +183,10 @@ final class AttendanceEngine: ObservableObject, @unchecked Sendable {
             if store.checkedInKeys.contains(key) || store.missedKeys.contains(key) { continue }
 
             let window = checkInWindow(for: start)
+            
+            // Process events that have closed (keys are persisted to prevent re-processing on login)
             if now > window.closesAt {
-                store.missedKeys.insert(key)
+                store.addMissedKey(key)
                 Task {
                     await store.addPoint()
                 }

@@ -15,7 +15,6 @@ struct TodayView: View {
                     scoreCard
                     nextClassCard
                     dailyScheduleCard
-                    weeklyScheduleCard
                 }
                 .padding(20)
             }
@@ -133,43 +132,11 @@ struct TodayView: View {
     }
 
     private var dailyScheduleCard: some View {
-        let todays = todaysClasses()
+        let now = Date()
+        let cal = Calendar.current
+        let todayWeekday = cal.component(.weekday, from: now)
 
         return VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Daily Schedule")
-                    .font(.headline)
-                    .foregroundStyle(AppColors.textSecondary)
-                Spacer()
-                Text("\(todays.count)")
-                    .font(.caption)
-                    .foregroundStyle(AppColors.textSecondary)
-                    .padding(.vertical, 6)
-                    .padding(.horizontal, 10)
-                    .background(Capsule().fill(Color.white.opacity(0.10)))
-            }
-
-            if todays.isEmpty {
-                Text("No classes scheduled today.")
-                    .foregroundStyle(AppColors.textSecondary)
-            } else {
-                VStack(spacing: 10) {
-                    ForEach(todays) { c in
-                        Button {
-                            scheduleTap(c)
-                        } label: {
-                            scheduleRow(c)
-                        }
-                        .buttonStyle(PressableRowStyle())
-                    }
-                }
-            }
-        }
-        .safeCard()
-    }
-    
-    private var weeklyScheduleCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text("Weekly Schedule")
                     .font(.headline)
@@ -177,56 +144,94 @@ struct TodayView: View {
                 Spacer()
             }
 
-            VStack(spacing: 12) {
-                ForEach(1...7, id: \.self) { weekday in
-                    let items = weeklyClasses(for: weekday)
-                    if !items.isEmpty {
-                        weekdayRow(weekday: weekday, items: items)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    ForEach(1...7, id: \.self) { weekday in
+                        let items = weeklyClasses(for: weekday)
+                        let isToday = weekday == todayWeekday
+                        
+                        weekDayColumn(weekday: weekday, items: items, isToday: isToday)
                     }
                 }
+                .padding(.horizontal, 4)
             }
         }
         .safeCard()
     }
     
-    private func weekdayRow(weekday: Int, items: [ClassItem]) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text(weekdayName(weekday))
-                    .font(.system(size: 16, weight: .semibold, design: .rounded))
-                    .foregroundStyle(AppColors.accentPop)
-                Spacer()
+    private func weekDayColumn(weekday: Int, items: [ClassItem], isToday: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            // Day header
+            VStack(alignment: .leading, spacing: 4) {
+                Text(weekdayNameShort(weekday))
+                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .foregroundStyle(AppColors.brightGreen)
+                
                 Text("\(items.count)")
-                    .font(.caption)
+                    .font(.caption2)
                     .foregroundStyle(AppColors.textSecondary)
-                    .padding(.vertical, 4)
-                    .padding(.horizontal, 8)
-                    .background(Capsule().fill(Color.white.opacity(0.10)))
+                    .padding(.vertical, 3)
+                    .padding(.horizontal, 6)
+                    .background(Capsule().fill(Color.white.opacity(isToday ? 0.15 : 0.10)))
             }
             
-            VStack(spacing: 6) {
-                ForEach(items) { c in
-                    HStack(spacing: 10) {
-                        Text(String(format: "%02d:%02d", c.hour, c.minute))
-                            .font(.system(size: 13, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.white)
-                            .padding(.vertical, 4)
-                            .padding(.horizontal, 8)
-                            .background(Capsule().fill(Color.white.opacity(0.10)))
-                            .frame(width: 60, alignment: .leading)
-                        
-                        Text(c.title)
-                            .font(.system(size: 14, weight: .medium, design: .rounded))
-                            .foregroundStyle(AppColors.textSecondary)
-                        
-                        Spacer()
+            // Events for this day
+            if items.isEmpty {
+                Text("—")
+                    .font(.caption)
+                    .foregroundStyle(AppColors.textSecondary.opacity(0.5))
+                    .frame(minWidth: 80)
+                    .frame(minHeight: 40)
+            } else {
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(items) { c in
+                        Button {
+                            scheduleTap(c)
+                        } label: {
+                            weekDayEventRow(c, isToday: isToday)
+                        }
+                        .buttonStyle(PressableRowStyle())
                     }
                 }
+                .frame(minWidth: 100)
             }
         }
-        .padding(.vertical, 8)
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color.white.opacity(isToday ? 0.12 : 0.06))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(isToday ? AppColors.accentPop.opacity(0.4) : Color.clear, lineWidth: 1.5)
+                )
+        )
     }
-
+    
+    private func weekDayEventRow(_ c: ClassItem, isToday: Bool) -> some View {
+        let status = engine.statusText(for: c)
+        let statusColor = statusColorFor(status)
+        
+        return VStack(alignment: .leading, spacing: 4) {
+            Text(String(format: "%02d:%02d", c.hour, c.minute))
+                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                .foregroundStyle(.white)
+                .padding(.vertical, 3)
+                .padding(.horizontal, 6)
+                .background(Capsule().fill(Color.white.opacity(0.15)))
+            
+            Text(c.title)
+                .font(.system(size: 12, weight: .medium, design: .rounded))
+                .foregroundStyle(isToday ? .white : AppColors.textSecondary)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+            
+            Text(status)
+                .font(.system(size: 9, weight: .medium, design: .rounded))
+                .foregroundStyle(statusColor)
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
     private func scheduleRow(_ c: ClassItem) -> some View {
         let status = engine.statusText(for: c)
         let statusColor = statusColorFor(status)
@@ -294,6 +299,12 @@ struct TodayView: View {
     
     private func weekdayName(_ w: Int) -> String {
         let symbols = Calendar.current.weekdaySymbols
+        let i = max(1, min(7, w)) - 1
+        return symbols[i]
+    }
+    
+    private func weekdayNameShort(_ w: Int) -> String {
+        let symbols = Calendar.current.shortWeekdaySymbols
         let i = max(1, min(7, w)) - 1
         return symbols[i]
     }

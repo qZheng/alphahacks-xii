@@ -106,13 +106,17 @@ struct EditClassView: View {
         }
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
+        .tint(.white)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button("Close") { dismiss() }
                     .foregroundStyle(.white)
             }
         }
-        .onAppear { load() }
+        .onAppear { 
+            load() 
+        }
         .appScreen()
     }
 
@@ -166,7 +170,6 @@ struct EditClassView: View {
             enabled = c.enabled
         }
 
-        // ✅ sync wheel picker with stored hour/minute
         time = cal.date(bySettingHour: hour, minute: minute, second: 0, of: Date()) ?? Date()
     }
 
@@ -174,7 +177,6 @@ struct EditClassView: View {
         let cleanTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
         let cal = Calendar.current
 
-        // ✅ sync stored hour/minute from wheel picker
         hour = cal.component(.hour, from: time)
         minute = cal.component(.minute, from: time)
 

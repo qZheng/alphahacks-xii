@@ -6,9 +6,12 @@ final class DataStore: ObservableObject {
     @Published var classes: [ClassItem] = []
     @Published var groups: [Group] = []
     
-    // Attendance tracking remains local (not stored on server)
+    // Attendance tracking - persisted locally to prevent re-processing on login
     @Published var checkedInKeys: Set<String> = []
     @Published var missedKeys: Set<String> = []
+    
+    private let checkedInKeysKey = "SchedooshDataStore.checkedInKeys"
+    private let missedKeysKey = "SchedooshDataStore.missedKeys"
     
     // API Configuration
     private let baseURL = "http://192.168.2.70:5000"
@@ -26,6 +29,61 @@ final class DataStore: ObservableObject {
     
     init() {
         // Initialize with empty data - will be loaded from server
+        loadKeys()
+    }
+    
+    // MARK: - Key Persistence
+    
+    func addCheckedInKey(_ key: String) {
+        checkedInKeys.insert(key)
+        saveKeys()
+    }
+    
+    func addMissedKey(_ key: String) {
+        missedKeys.insert(key)
+        saveKeys()
+    }
+    
+    private func saveKeys() {
+        UserDefaults.standard.set(Array(checkedInKeys), forKey: checkedInKeysKey)
+        UserDefaults.standard.set(Array(missedKeys), forKey: missedKeysKey)
+    }
+    
+    private func loadKeys() {
+        if let checkedInArray = UserDefaults.standard.array(forKey: checkedInKeysKey) as? [String] {
+            checkedInKeys = Set(checkedInArray)
+        }
+        if let missedArray = UserDefaults.standard.array(forKey: missedKeysKey) as? [String] {
+            missedKeys = Set(missedArray)
+        }
+    }
+    
+    /// Reload keys from UserDefaults (useful after login)
+    func reloadKeys() {
+        loadKeys()
+    }
+    
+    private func clearOldKeys() {
+        // Clear keys from previous weeks (keep only current week)
+        let cal = Calendar.current
+        let now = Date()
+        let weekAgo = cal.date(byAdding: .day, value: -7, to: now) ?? now
+        
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        let cutoffDate = formatter.string(from: weekAgo)
+        
+        checkedInKeys = Set(checkedInKeys.filter { key in
+            guard let dateString = key.components(separatedBy: "::").last else { return false }
+            return dateString >= cutoffDate
+        })
+        
+        missedKeys = Set(missedKeys.filter { key in
+            guard let dateString = key.components(separatedBy: "::").last else { return false }
+            return dateString >= cutoffDate
+        })
+        
+        saveKeys()
     }
     
     // MARK: - Data Fetching
@@ -310,11 +368,15 @@ final class DataStore: ObservableObject {
         profile = UserProfile()
         classes = []
         groups = []
-        checkedInKeys = []
-        missedKeys = []
+        // Don't clear keys on logout - they should persist across logins to prevent re-processing events
         classIdMap.removeAll()
         groupIdMap.removeAll()
         memberIdMap.removeAll()
+    }
+    
+    /// Clean up old keys (call periodically, e.g., on app launch)
+    func cleanupOldKeys() {
+        clearOldKeys()
     }
     
     // MARK: - Class Management
