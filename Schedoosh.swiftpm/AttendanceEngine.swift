@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import CoreLocation
 
 @MainActor
 final class AttendanceEngine: ObservableObject, @unchecked Sendable {
@@ -30,7 +31,10 @@ final class AttendanceEngine: ObservableObject, @unchecked Sendable {
         runAutoChecks(forceMessage: true)
     }
 
-    func checkInNow(for classItem: ClassItem) {
+    func checkInNow(for classItem: ClassItem,
+                    locationManager: LocationManager,
+                    buildings: BuildingStore) async {
+
         let now = Date()
         let cal = Calendar.current
 
@@ -55,9 +59,59 @@ final class AttendanceEngine: ObservableObject, @unchecked Sendable {
             return
         }
 
-        store.checkedInKeys.insert(key)
-        lastCheckMessage = "Checked in: \(classItem.title) ✅"
+        // 1) Resolve building from building code
+        let rawCode = classItem.buildingCode ?? ""
+        let code = rawCode.filter { $0.isLetter }.uppercased()
+
+        guard !code.isEmpty else {
+            lastCheckMessage = "No building code set for \(classItem.title)."
+            return
+        }
+
+        guard let building = buildings.building(for: code) else {
+            lastCheckMessage = "Building code \(code) isn’t in buildings.json."
+            return
+        }
+
+        // 2) Get user location (one-shot)
+        do {
+            let loc = try await locationManager.getCurrentLocation(timeoutSeconds: 10)
+
+            // Optional: avoid garbage GPS fixes
+            if loc.horizontalAccuracy < 0 || loc.horizontalAccuracy > 250 {
+                lastCheckMessage = "Location accuracy too low (~\(Int(max(loc.horizontalAccuracy, 0)))m). Try again."
+                return
+            }
+
+            // 3) Distance check
+            let target = CLLocation(latitude: building.coordinate.latitude,
+                                    longitude: building.coordinate.longitude)
+
+            let distance = loc.distance(from: target)
+            let radius = building.effectiveRadiusMeters
+
+            guard distance <= radius else {
+                lastCheckMessage = "Not at \(code): \(formatMeters(distance)) away (need ≤ \(Int(radius))m)."
+                return
+            }
+
+            // 4) Success
+            store.checkedInKeys.insert(key)
+            lastCheckMessage = "Checked in: \(classItem.title) @ \(code) ✅"
+
+        } catch {
+            lastCheckMessage = "Location failed: \(error.localizedDescription)"
+        }
     }
+
+    private func formatMeters(_ meters: Double) -> String {
+        if meters >= 1000 {
+            return String(format: "%.2f km", meters / 1000.0)
+        } else {
+            return "\(Int(meters.rounded())) m"
+        }
+    }
+
 
     func canCheckInNow(for classItem: ClassItem) -> Bool {
         guard classItem.enabled else { return false }

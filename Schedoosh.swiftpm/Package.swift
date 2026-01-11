@@ -17,7 +17,7 @@ let package = Package(
             name: "Schedoosh",
             targets: ["AppModule"],
             bundleIdentifier: "com.Schadoosh.Schedoosh",
-            teamIdentifier: "UMJRA94U52",
+            teamIdentifier: "U42QPW3ZVB",
             displayVersion: "1.0",
             bundleVersion: "1",
             appIcon: .placeholder(icon: .note),
@@ -31,6 +31,10 @@ let package = Package(
                 .landscapeRight,
                 .landscapeLeft,
                 .portraitUpsideDown(.when(deviceFamilies: [.pad]))
+            ],
+            capabilities: [
+                .locationAlwaysAndWhenInUse(purposeString: "We use your location during class start times to verify attendance."),
+                .calendars(purposeString: "We use canel")
             ]
         )
     ],
@@ -40,5 +44,5 @@ let package = Package(
             path: "."
         )
     ],
-    swiftLanguageVersions: [.v6]
+    swiftLanguageVersions: [.version("6")]
 )

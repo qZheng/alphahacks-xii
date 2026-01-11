@@ -3,6 +3,9 @@ import SwiftUI
 struct TodayView: View {
     @EnvironmentObject var store: DataStore
     @EnvironmentObject var engine: AttendanceEngine
+    @EnvironmentObject var location: LocationManager
+    @EnvironmentObject var buildings: BuildingStore
+
 
     var body: some View {
         NavigationStack {
@@ -21,7 +24,12 @@ struct TodayView: View {
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
         }
+        .task {
+            // This triggers the permission prompt on first launch (status == .notDetermined)
+            _ = await location.requestAuthorizationIfNeeded()
+        }
     }
+
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -93,7 +101,9 @@ struct TodayView: View {
                 }
 
                 Button {
-                    engine.checkInNow(for: c)
+                    Task {
+                        await engine.checkInNow(for: c, locationManager: location, buildings: buildings)
+                    }
                 } label: {
                     Text(isChecked ? "Checked In ✅" : (isMissed ? "Missed" : (can ? "Check In ✅" : "Not in window")))
                 }
@@ -185,7 +195,9 @@ struct TodayView: View {
 
     private func scheduleTap(_ c: ClassItem) {
         if engine.canCheckInNow(for: c) {
-            engine.checkInNow(for: c)
+            Task {
+                await engine.checkInNow(for: c, locationManager: location, buildings: buildings)
+            }
         } else {
             engine.lastCheckMessage = "\(c.title): \(engine.statusText(for: c))"
         }

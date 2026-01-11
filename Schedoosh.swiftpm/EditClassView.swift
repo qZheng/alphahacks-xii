@@ -68,6 +68,7 @@ struct EditClassView: View {
                         .datePickerStyle(.wheel)
                         .labelsHidden()
                         .tint(AppColors.accentPop)
+                        .environment(\.colorScheme, .dark)
                     }
 
                     Text("Check-in window is 10 minutes before to 10 minutes after start time.")
@@ -89,7 +90,7 @@ struct EditClassView: View {
             }
             .padding(20)
         }
-        .navigationTitle(navTitle)
+        .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {

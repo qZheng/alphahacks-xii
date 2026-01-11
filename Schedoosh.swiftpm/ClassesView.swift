@@ -1,8 +1,19 @@
 import SwiftUI
 
+
+
 struct ClassesView: View {
     @EnvironmentObject var store: DataStore
+
+    @StateObject private var calendarService = CalendarService()
+
+    @State private var isImporting = false
+    @State private var showingImportAlert = false
+    @State private var importAlertText = ""
+
     @State private var showingAdd = false
+    @EnvironmentObject var buildings: BuildingStore
+
 
     var body: some View {
         NavigationStack {
@@ -28,16 +39,40 @@ struct ClassesView: View {
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItemGroup(placement: .topBarTrailing) {
+
+                    Button {
+                        Task {
+                            guard !isImporting else { return }
+                            isImporting = true
+                            defer { isImporting = false }
+
+                            let result = await calendarService.importUpcomingClasses(into: store, daysAhead: 14)
+
+                            // Use CalendarService's status message if you set one
+                            importAlertText = calendarService.lastImportMessage
+                            if importAlertText.isEmpty {
+                                importAlertText = "Imported \(result.added) new, updated \(result.updated)."
+                            }
+                            showingImportAlert = true
+                        }
+                    } label: {
+                        Image(systemName: "calendar.badge.plus")
+                    }
+                    .disabled(isImporting)
                     Button {
                         showingAdd = true
                     } label: {
                         Image(systemName: "plus")
-                            .font(.system(size: 17, weight: .semibold))
-                            .foregroundStyle(AppColors.accentPop)
                     }
                 }
             }
+            .alert("Calendar Import", isPresented: $showingImportAlert) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(importAlertText)
+            }
+
             .sheet(isPresented: $showingAdd) {
                 NavigationStack { EditClassView(mode: .add) }
             }
@@ -113,10 +148,29 @@ struct ClassesView: View {
                                 Text(c.title)
                                     .font(.system(size: 16, weight: .semibold, design: .rounded))
                                     .foregroundStyle(.white)
-                                Text(c.enabled ? "Enabled" : "Disabled")
-                                    .font(.caption)
-                                    .foregroundStyle(c.enabled ? AppColors.textSecondary : Color.white.opacity(0.55))
+
+                                // Status + building code (if present)
+                                HStack(spacing: 6) {
+                                    Text(c.enabled ? "Enabled" : "Disabled")
+                                        .font(.caption)
+                                        .foregroundStyle(c.enabled ? AppColors.textSecondary : Color.white.opacity(0.55))
+
+                                    // Determine building info
+                                    let code = (c.buildingCode ?? "").filter { $0.isLetter }.uppercased()
+                                    let known = buildings.isKnownBuilding(code: code)
+
+                                    if !code.isEmpty {
+                                        Text("· \(code)\(known ? "" : " (unknown)")")
+                                            .font(.caption)
+                                            .foregroundStyle(known ? AppColors.textSecondary : Color.orange.opacity(0.9))
+                                    } else {
+                                        Text("· No building")
+                                            .font(.caption)
+                                            .foregroundStyle(Color.orange.opacity(0.9))
+                                    }
+                                }
                             }
+
                             Spacer()
                             Image(systemName: "chevron.right")
                                 .font(.system(size: 13, weight: .semibold))
