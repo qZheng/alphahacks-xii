@@ -18,6 +18,7 @@ struct EditClassView: View {
     @State private var enabled: Bool = true
 
     @State private var time: Date = Date()
+    @State private var isSaving: Bool = false
 
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
@@ -79,7 +80,20 @@ struct EditClassView: View {
 
                 Button(saveTitle) { save() }
                     .buttonStyle(PrimaryButtonStyle())
-                    .disabled(!canSave)
+                    .disabled(!canSave || isSaving)
+                
+                if isSaving {
+                    ProgressView()
+                        .tint(.white)
+                }
+                
+                if let error = store.lastError {
+                    Text(error)
+                        .font(.footnote)
+                        .foregroundStyle(AppColors.danger)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                }
 
                 if case .edit = mode {
                     Button(role: .destructive) { delete() } label: {
@@ -164,6 +178,9 @@ struct EditClassView: View {
         hour = cal.component(.hour, from: time)
         minute = cal.component(.minute, from: time)
 
+        isSaving = true
+        store.lastError = nil
+        
         Task {
             switch mode {
             case .add:
@@ -188,7 +205,11 @@ struct EditClassView: View {
                 await store.updateClass(updated)
             }
             await MainActor.run {
-                dismiss()
+                isSaving = false
+                // Only dismiss if there's no error
+                if store.lastError == nil {
+                    dismiss()
+                }
             }
         }
     }

@@ -20,16 +20,8 @@ struct SchedooshApp: App {
                 .environmentObject(store)
                 .environmentObject(engine)
                 .environmentObject(auth)
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
                 .environmentObject(buildings)
                 .environmentObject(location)
-=======
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
                 .environmentObject(location)
                 .onAppear {
                     store.authStore = auth
@@ -48,13 +40,6 @@ struct SchedooshApp: App {
                         store.clearAll()
                     }
                 }
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
         }
     }
 }

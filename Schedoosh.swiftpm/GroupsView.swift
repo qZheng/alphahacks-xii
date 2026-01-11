@@ -58,6 +58,11 @@ struct GroupsView: View {
                     Button { showingAdd = true } label: { Image(systemName: "plus") }
                 }
             }
+            .onAppear {
+                Task {
+                    await store.fetchGroups()
+                }
+            }
             .sheet(isPresented: $showingAdd) {
                 NavigationStack {
                     ScrollView {
